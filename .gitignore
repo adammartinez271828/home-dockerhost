@@ -1,0 +1,5 @@
+.env
+data
+etc-dnsmasq.d
+etc-pihole
+mealie
