@@ -61,6 +61,43 @@ services:
     # volumes:
       # - /root/my-config.yml:/app/public/conf.yml
 
+  db_recipes:
+    container_name: con_db_recipes
+    image: postgres:11-alpine
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    volumes:
+      - ./postgresql:/var/lib/postgresql/data
+
+  web_recipes:
+    container_name: con_web_recipes
+    image: vabene1111/recipes
+    restart: unless-stopped
+    depends_on:
+      - db_recipes
+    env_file:
+      - ./.env
+    volumes:
+      - staticfiles:/opt/recipes/staticfiles
+      - nginx_config:/opt/recipes/nginx/conf.d
+      - ./mediafiles:/opt/recipes/mediafiles
+
+  nginx_recipes:
+    container_name: con_nginx_recipes
+    image: nginx:mainline-alpine
+    restart: unless-stopped
+    depends_on:
+      - web_recipes
+    env_file:
+      - ./.env
+    # ports:
+      # - 80:80
+    volumes:
+      - nginx_config:/etc/nginx/conf.d:ro
+      - staticfiles:/static:ro
+      - ./mediafiles:/media:ro
+
 networks:
   default:
     name: network_landockernet
