@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -ex
+
 # basic config
 if [[ `tail /etc/profile` != *neofetch* ]]; then
 	echo -e "\n\nneofetch\n" >> /etc/profile
