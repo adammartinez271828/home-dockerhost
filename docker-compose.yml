@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     environment:
       DNSMASQ_LISTENING: 'all'
-      PIHOLE_DNS_: 1.1.1.1;1.0.0.1
+      PIHOLE_DNS_: 1.1.1.2;1.0.0.2
       TZ: 'America/New_York'
       WEBPASSWORD: '${PW_PIHOLE}'
       WEBTHEME: 'default-dark'
@@ -98,7 +98,10 @@ services:
       - staticfiles:/static:ro
       - ./mediafiles:/media:ro
 
+volumes:
+  nginx_config:
+  staticfiles:
+
 networks:
   default:
     name: network_landockernet
-    external: true
