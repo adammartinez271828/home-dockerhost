@@ -10,6 +10,9 @@ cat /etc/motd >> /etc/motd.old
 rm /etc/motd
 touch /etc/motd
 
+# set config on a pi to allow docker to see app memory
+echo -n " cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory" >> /boot/cmdline.txt
+
 # update
 apt update
 apt -y upgrade
