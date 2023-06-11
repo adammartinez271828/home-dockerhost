@@ -3,3 +3,4 @@ data
 etc-dnsmasq.d
 etc-pihole
 mediafiles
+dashy_conf.yml

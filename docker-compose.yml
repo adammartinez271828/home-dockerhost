@@ -58,8 +58,8 @@ services:
     # ports:
       # - 4000:80
     # Pass in your config file below, by specifying the path on your host machine
-    # volumes:
-      # - /root/my-config.yml:/app/public/conf.yml
+    volumes:
+      - /home/pi/devel/home-dockerhost/dashy_conf.yml:/app/public/conf.yml
 
   db_recipes:
     container_name: con_db_recipes

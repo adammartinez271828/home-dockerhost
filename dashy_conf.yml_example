@@ -1,0 +1,108 @@
+pageInfo:
+  title: Dashy
+  description: Welcome to your new dashboard!
+  navLinks:
+    - title: GitHub
+      path: https://github.com/Lissy93/dashy
+    - title: Documentation
+      path: https://dashy.to/docs
+appConfig:
+  auth:
+    users:
+      - user: adam
+        hash: 0000000000000000000000000000000000000000000000000000000000000000
+        type: admin
+    enableGuestAccess: true
+    # disableConfigurationForNonAdmin: true
+  theme: colorful
+  layout: auto
+  iconSize: medium
+  language: en
+sections:
+  - name: Getting Started
+    icon: fas fa-rocket
+    items:
+      - title: Dashy Live
+        description: Development a project management links for Dashy
+        icon: https://i.ibb.co/qWWpD0v/astro-dab-128.png
+        url: https://live.dashy.to/
+        target: newtab
+        id: 0_1481_dashylive
+      - title: GitHub
+        description: Source Code, Issues and Pull Requests
+        url: https://github.com/lissy93/dashy
+        icon: favicon
+        id: 1_1481_github
+      - title: Docs
+        description: Configuring & Usage Documentation
+        provider: Dashy.to
+        icon: far fa-book
+        url: https://dashy.to/docs
+        id: 2_1481_docs
+      - title: Showcase
+        description: See how others are using Dashy
+        url: https://github.com/Lissy93/dashy/blob/master/docs/showcase.md
+        icon: far fa-grin-hearts
+        id: 3_1481_showcase
+      - title: Config Guide
+        description: See full list of configuration options
+        url: https://github.com/Lissy93/dashy/blob/master/docs/configuring.md
+        icon: fas fa-wrench
+        id: 4_1481_configguide
+      - title: Support
+        description: Get help with Dashy, raise a bug, or get in contact
+        url: https://github.com/Lissy93/dashy/blob/master/.github/SUPPORT.md
+        icon: far fa-hands-helping
+        id: 5_1481_support
+    displayData:
+      sortBy: default
+      rows: 1
+      cols: 1
+      collapsed: false
+      hideForGuests: true
+  - name: Technical Services
+    icon: fas fa-wrench
+    displayData:
+      sortBy: alphabetical
+      rows: 1
+      cols: 1
+      collapsed: false
+      hideForGuests: false
+    items:
+      - title: Pihole 1
+        description: Primary DNS
+        icon: http://pihole.lan/admin/img/favicons/favicon-16x16.png
+        url: http://pihole.lan/admin/
+        target: sametab
+        statusCheck: true
+        id: 0_1775_pihole
+      - title: Pihole 2
+        description: Primary DNS
+        icon: http://pihole2.lan/admin/img/favicons/favicon-16x16.png
+        url: http://pihole2.lan/admin/
+        target: sametab
+        statusCheck: true
+        id: 1_1775_pihole
+      - title: Reverse Proxy
+        description: Nginx Proxy Manager
+        icon: http://dockerhost.lan:81/images/favicons/favicon-16x16.png
+        url: http://dockerhost.lan:81/login
+        target: sametab
+        statusCheck: true
+        id: 2_1775_reverseproxy
+  - name: Home Services
+    icon: si-gunicorn
+    displayData:
+      sortBy: alphabetical
+      rows: 1
+      cols: 1
+      collapsed: false
+      hideForGuests: false
+    items:
+      - title: Recipe Book
+        description: Tandoor
+        icon: ':curry:'
+        url: http://tandoor.lan/
+        target: newtab
+        statusCheck: true
+        id: 0_1261_recipebook
