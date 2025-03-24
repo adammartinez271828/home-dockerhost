@@ -1,9 +1,9 @@
-version: '3.7'
 services:
 
   nginx-proxy-manager:
     container_name: con_nginx-proxy-manager
     image: jc21/nginx-proxy-manager:latest
+    # image: 0be5f593d87f  # current image
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "/bin/check-health"]
@@ -19,7 +19,8 @@ services:
 
   pihole2:
     container_name: con_pihole2
-    image: pihole/pihole:latest
+    # image: pihole/pihole:latest
+    image: 927e98542471  # current image
     restart: unless-stopped
     environment:
       DNSMASQ_LISTENING: 'all'
@@ -42,7 +43,8 @@ services:
 
   dashy:
     container_name: con_dashy
-    image: lissy93/dashy
+    # image: lissy93/dashy
+    image: d638c03ba733
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -63,7 +65,8 @@ services:
 
   db_recipes:
     container_name: con_db_recipes
-    image: postgres:11-alpine
+    image: postgres:16-alpine
+    # image: 171b3a8784df  # current image
     restart: unless-stopped
     env_file:
       - ./.env
@@ -73,6 +76,7 @@ services:
   web_recipes:
     container_name: con_web_recipes
     image: vabene1111/recipes
+    # image: 9f64c6c95da4  # current image
     restart: unless-stopped
     depends_on:
       - db_recipes
@@ -86,6 +90,7 @@ services:
   nginx_recipes:
     container_name: con_nginx_recipes
     image: nginx:mainline-alpine
+    # image: cedb667e1a7b  # current image
     restart: unless-stopped
     depends_on:
       - web_recipes
