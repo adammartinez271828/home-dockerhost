@@ -23,9 +23,9 @@ if ! grep -q cgroup_memory "$CMDLINE"; then
 fi
 
 # update
-apt update
-apt -y upgrade
-apt -y install git vim neofetch ca-certificates curl gnupg avahi-daemon avahi-utils
+apt-get update
+apt-get -y upgrade
+apt-get -y install git vim neofetch ca-certificates curl gnupg avahi-daemon avahi-utils
 
 # install docker
 install -m 0755 -d /etc/apt/keyrings
@@ -37,8 +37,8 @@ echo \
   "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
   tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-apt update
-apt -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get update
+apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # add pi user to docker group
 usermod -aG docker pi
