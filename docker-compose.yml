@@ -23,6 +23,13 @@ services:
       - ./env.d/recipes.env
     volumes:
       - ./postgresql:/var/lib/postgresql/data
+    healthcheck:
+      # user/db match POSTGRES_USER/POSTGRES_DB in env.d/recipes.env
+      test: ["CMD-SHELL", "pg_isready -U djangouser -d djangodb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   web_recipes:
     container_name: con_web_recipes
@@ -30,7 +37,8 @@ services:
     # image: 9f64c6c95da4  # current image
     restart: unless-stopped
     depends_on:
-      - db_recipes
+      db_recipes:
+        condition: service_healthy
     env_file:
       - ./env.d/recipes.env
     volumes:
