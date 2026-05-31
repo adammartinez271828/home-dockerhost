@@ -93,7 +93,9 @@ Three explicit edits (no auto-discovery):
 
 - **NextDNS** (cloud) handles general DNS; the Nest WiFi router has no local-DNS
   feature, which is why friendly names come from mDNS rather than DNS rewrites.
-- **Android** doesn't resolve `.local` well and isn't supported here (not needed).
+- **Android:** older versions don't resolve `.local` at all; Android 12+ usually
+  can, but support is inconsistent across devices and browsers. Not relied on here
+  (no important Android devices).
 - Pi-hole and nginx-proxy-manager previously lived here (superseded by NextDNS +
   Caddy); recover from git history if needed.
 - Before upgrading an image, the prior digest is kept as a commented
