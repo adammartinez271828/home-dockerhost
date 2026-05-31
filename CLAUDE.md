@@ -50,4 +50,4 @@ make update        # pull newer images and re-up
 
 ## Host provisioning
 
-`setup.sh` is a one-time bootstrap run as root on a fresh Debian/Pi host: installs Docker CE + compose plugin, adds the `pi` user to the `docker` group, sets up json-file log rotation, and appends cgroup memory flags to `/boot/cmdline.txt` (required for Docker memory accounting on the Pi — needs a reboot). It is idempotent-ish but intended to run once at provision time, not as part of normal deploys.
+`scripts/setup.sh` is a one-time bootstrap run as root on a fresh Debian/Pi host: installs Docker CE + compose plugin, adds the `pi` user to the `docker` group, sets up json-file log rotation, and appends cgroup memory flags to `/boot/cmdline.txt` (required for Docker memory accounting on the Pi — needs a reboot). It is idempotent-ish but intended to run once at provision time, not as part of normal deploys.

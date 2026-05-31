@@ -85,8 +85,9 @@ Three explicit edits (no auto-discovery):
 | `env.d/` | per-service env files (`*.env` gitignored, `*.env.example` tracked) |
 | `mdns-aliases/` | mDNS `.local` publisher: `aliases` list, script, systemd unit |
 | `Makefile` | common lifecycle commands |
-| `setup.sh` | one-time host bootstrap (Docker CE, log rotation, cgroup flags) |
-| `db-migration-commands.txt`, `pg_extract.sh` | Postgres major-version upgrade runbook |
+| `scripts/setup.sh` | one-time host bootstrap (Docker CE, log rotation, cgroup flags) |
+| `scripts/pg_extract.sh` | slice one DB out of a `pg_dumpall` dump |
+| `docs/db-migration.md` | Postgres major-version upgrade runbook |
 | `CLAUDE.md` | guidance for Claude Code in this repo |
 
 ## Notes
