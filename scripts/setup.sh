@@ -25,7 +25,7 @@ fi
 # update
 apt update
 apt -y upgrade
-apt -y install git vim neofetch ca-certificates curl gnupg
+apt -y install git vim neofetch ca-certificates curl gnupg avahi-daemon avahi-utils
 
 # install docker
 install -m 0755 -d /etc/apt/keyrings
