@@ -1,0 +1,16 @@
+[Unit]
+Description=Publish mDNS (.local) aliases for hosted services
+Requires=avahi-daemon.service
+After=avahi-daemon.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Override the advertised IP here if the Pi's reserved address ever changes.
+# Environment=MDNS_IP=192.168.86.197
+ExecStart=/home/pi/devel/home-dockerhost/mdns-aliases/mdns-aliases.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

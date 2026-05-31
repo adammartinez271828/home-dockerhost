@@ -1,0 +1,16 @@
+# Reverse proxy config for LAN services. Plain HTTP only.
+#
+# The `http://` scheme prefix disables Caddy's automatic HTTPS for the site.
+# Caddy preserves the incoming Host header upstream by default.
+#
+# To add a service: add a block here, then `make caddy-reload`. Also add the
+# matching name to mdns-aliases/aliases so it resolves on the LAN.
+
+http://recipes.local {
+	reverse_proxy nginx_recipes:80
+}
+
+# Example for the upcoming network-monitoring service:
+# http://monitor.local {
+# 	reverse_proxy con_monitor:<port>
+# }

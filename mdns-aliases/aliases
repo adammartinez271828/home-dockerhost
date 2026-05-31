@@ -1,0 +1,8 @@
+# mDNS (.local) hostnames to advertise on the LAN, one per line.
+# Each is published as an A record pointing at this host's IP (see MDNS_IP in
+# the systemd unit). Blank lines and # comments are ignored.
+#
+# After editing: `make mdns-restart`.
+
+recipes.local
+# monitor.local
