@@ -66,6 +66,21 @@ make backup-db     # dump the recipes Postgres DB into backups/
 make update        # pull newer images and re-up
 ```
 
+## Local checks (pre-commit)
+
+In place of CI, a committed `.githooks/pre-commit` validates changes locally:
+`shellcheck` on the shell scripts and `docker compose config -q` on the stack.
+Enable it once per clone:
+
+```sh
+make dev-setup   # enable the hook + check for shellcheck / docker compose
+```
+
+Each check skips gracefully if its tool isn't installed, and the compose check
+falls back to `env.d/recipes.env.example` when the real env file is absent — so
+it works on a secret-less dev clone. `scripts/setup.sh` enables the hook on the
+Pi automatically. Bypass once with `git commit --no-verify`.
+
 ## Adding a service
 
 Three explicit edits (no auto-discovery):
@@ -85,7 +100,9 @@ Three explicit edits (no auto-discovery):
 | `env.d/` | per-service env files (`*.env` gitignored, `*.env.example` tracked) |
 | `mdns-aliases/` | mDNS `.local` publisher: `aliases` list, script, systemd unit |
 | `Makefile` | common lifecycle commands |
-| `scripts/setup.sh` | one-time host bootstrap (Docker CE, log rotation, cgroup flags) |
+| `scripts/setup.sh` | one-time host bootstrap (Docker CE, log rotation, cgroup flags, pre-commit hook) |
+| `scripts/dev-setup.sh` | dev-clone bootstrap: enable pre-commit hook + check tooling |
+| `.githooks/` | git hooks (pre-commit: shellcheck + `docker compose config`) |
 | `scripts/pg_extract.sh` | slice one DB out of a `pg_dumpall` dump |
 | `docs/db-migration.md` | Postgres major-version upgrade runbook |
 | `CLAUDE.md` | guidance for Claude Code in this repo |

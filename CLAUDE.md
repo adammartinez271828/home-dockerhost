@@ -29,6 +29,7 @@ DNS is **NextDNS** (cloud) + a Nest WiFi router with no local-DNS feature, so fr
 
 - **Secrets live outside git.** Per-service env files live in `env.d/` (e.g. `env.d/recipes.env`); `env.d/*.env` is gitignored while `env.d/*.env.example` templates are committed. Edit the `.example` when documenting new config, and the real file (locally, never committed) when deploying.
 - **Image pinning before upgrades.** When upgrading a service, the prior image digest is recorded as a commented `# image: <sha>  # current image` line above the live `image:` so a known-good version can be rolled back to. Preserve this pattern.
+- **Local checks instead of CI.** A committed `.githooks/pre-commit` runs `shellcheck` on the shell scripts and `docker compose config -q` on the stack; each check skips if its tool is absent, and the compose check falls back to `env.d/recipes.env.example` when the real env file is missing. Enable it on a dev clone with `make dev-setup`; `scripts/setup.sh` enables it on the Pi. Keep scripts shellcheck-clean and the compose file valid so commits aren't blocked — and don't start a shell comment with `# shellcheck`, which shellcheck parses as a (malformed) directive.
 
 ## Common commands
 
@@ -42,6 +43,7 @@ make mdns-install  # install + enable the mDNS alias service (one-time, sudo)
 make mdns-restart  # re-publish after editing mdns-aliases/aliases
 make backup-db     # dump the recipes Postgres DB into backups/
 make update        # pull newer images and re-up
+make dev-setup     # enable the pre-commit hook + check dev tooling (per clone)
 ```
 
 ## Recipes DB upgrade / migration
@@ -50,4 +52,6 @@ make update        # pull newer images and re-up
 
 ## Host provisioning
 
-`scripts/setup.sh` is a one-time bootstrap run as root on a fresh Debian/Pi host: installs Docker CE + compose plugin, adds the `pi` user to the `docker` group, sets up json-file log rotation, and appends cgroup memory flags to `/boot/cmdline.txt` (required for Docker memory accounting on the Pi — needs a reboot). It is idempotent-ish but intended to run once at provision time, not as part of normal deploys.
+`scripts/setup.sh` is a one-time bootstrap run as root on a fresh Debian/Pi host: installs Docker CE + compose plugin (plus `shellcheck` for the pre-commit hook), adds the `pi` user to the `docker` group, enables the repo's git pre-commit hook, sets up json-file log rotation, and appends cgroup memory flags to `/boot/cmdline.txt` (required for Docker memory accounting on the Pi — needs a reboot). It is idempotent-ish but intended to run once at provision time, not as part of normal deploys.
+
+`scripts/dev-setup.sh` (or `make dev-setup`) is the counterpart for a clone that *works on* the repo but doesn't host the stack (a laptop, a Mac): it enables the pre-commit hook and checks for `shellcheck` / `docker compose`, printing a per-package-manager install hint for anything missing. Portable and non-root; safe to re-run.

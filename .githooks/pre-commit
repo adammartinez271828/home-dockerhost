@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Pre-commit checks for home-dockerhost. Enable with: make hooks-install
+#
+# Each check is gated on its tooling actually being present, so a checkout
+# without shellcheck or the Docker Compose plugin (e.g. a dev laptop) is
+# never falsely blocked -- the check just prints "skipped".
+set -u
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+status=0
+
+# --- shellcheck: lint the shell scripts (and this hook) ---
+if command -v shellcheck >/dev/null 2>&1; then
+	if shellcheck scripts/*.sh mdns-aliases/*.sh .githooks/pre-commit; then
+		echo "pre-commit: shellcheck OK"
+	else
+		echo "pre-commit: shellcheck FAILED" >&2
+		status=1
+	fi
+else
+	echo "pre-commit: shellcheck skipped (not installed)"
+fi
+
+# --- docker compose config: validate the stack definition ---
+if docker compose version >/dev/null 2>&1; then
+	# `config` requires every env_file target to exist. On a secret-less
+	# checkout the real env.d/recipes.env is absent (gitignored), so fall back
+	# to the committed example just for the check, and remove it on exit.
+	if [ ! -f env.d/recipes.env ] && [ -f env.d/recipes.env.example ]; then
+		cp env.d/recipes.env.example env.d/recipes.env
+		trap 'rm -f env.d/recipes.env' EXIT
+	fi
+	if docker compose config -q; then
+		echo "pre-commit: docker compose config OK"
+	else
+		echo "pre-commit: docker compose config FAILED" >&2
+		status=1
+	fi
+else
+	echo "pre-commit: docker compose check skipped (compose plugin not installed)"
+fi
+
+[ "$status" -ne 0 ] && echo "pre-commit: checks failed; use 'git commit --no-verify' to override." >&2
+exit "$status"

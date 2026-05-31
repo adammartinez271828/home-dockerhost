@@ -6,7 +6,8 @@ BACKUP_KEEP_DAYS ?= 30
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart pull update ps logs caddy-reload \
-        mdns-install mdns-restart mdns-status backup-db backup-prune
+        mdns-install mdns-restart mdns-status backup-db backup-prune \
+        dev-setup
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -56,3 +57,6 @@ backup-db: ## Dump the recipes Postgres DB into backups/
 backup-prune: ## Delete DB backups older than BACKUP_KEEP_DAYS (default 30)
 	@find backups -name 'recipes-*.sql' -type f -mtime +$(BACKUP_KEEP_DAYS) -print -delete 2>/dev/null || true
 	@echo "Pruned backups older than $(BACKUP_KEEP_DAYS) days"
+
+dev-setup: ## Set up a dev clone: enable pre-commit hooks + check tooling (one-time)
+	@./scripts/dev-setup.sh

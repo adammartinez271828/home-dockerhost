@@ -5,7 +5,7 @@
 set -ex
 
 # basic config
-if [[ `tail /etc/profile` != *neofetch* ]]; then
+if [[ $(tail /etc/profile) != *neofetch* ]]; then
 	echo -e "\n\nneofetch\n" >> /etc/profile
 fi
 # archive then blank the default motd (idempotent: only if motd has content)
@@ -25,16 +25,19 @@ fi
 # update
 apt-get update
 apt-get -y upgrade
-apt-get -y install git vim neofetch ca-certificates curl gnupg avahi-daemon avahi-utils
+# also installs shellcheck for the pre-commit hook (see .githooks/); the Pi commits too
+apt-get -y install git vim neofetch ca-certificates curl gnupg avahi-daemon avahi-utils shellcheck
 
 # install docker
 install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 chmod a+r /etc/apt/keyrings/docker.gpg
 
+arch=$(dpkg --print-architecture)
+# shellcheck disable=SC1091  # /etc/os-release exists on the Debian host, not at lint time
+codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
 echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $codename stable" | \
   tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 apt-get update
@@ -57,3 +60,9 @@ EOF
 # start the service
 systemctl enable docker.service
 systemctl enable containerd.service
+
+# enable the repo's git pre-commit hook (shellcheck + compose validation) for
+# the pi user's clone, so provisioning yields a working hook. Deps (shellcheck,
+# compose plugin) are installed above. Run as pi to avoid root-owning .git/config.
+REPO_ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+sudo -u pi git -C "$REPO_ROOT" config core.hooksPath .githooks

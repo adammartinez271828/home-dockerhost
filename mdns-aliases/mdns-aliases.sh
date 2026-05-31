@@ -12,7 +12,7 @@
 # silently unadvertised. Uses bash for `wait -n`.
 set -eu
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 ALIASES_FILE="${ALIASES_FILE:-$SCRIPT_DIR/aliases}"
 IP="${MDNS_IP:-192.168.86.197}"
 
@@ -40,5 +40,6 @@ fi
 # rest and exit non-zero so the service restarts and re-publishes everything.
 wait -n || true
 echo "mdns-aliases: a publisher exited unexpectedly; restarting all aliases" >&2
+# shellcheck disable=SC2086  # $pids is a space-separated PID list; intentional word split
 kill $pids 2>/dev/null || true
 exit 1
