@@ -36,7 +36,9 @@ caddy-reload: ## Reload Caddy after editing the Caddyfile (no downtime)
 	$(COMPOSE) exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 mdns-install: ## Install + enable the mDNS alias service (one-time, sudo)
-	sudo cp mdns-aliases/mdns-aliases.service /etc/systemd/system/mdns-aliases.service
+	sed 's|^ExecStart=.*|ExecStart=$(CURDIR)/mdns-aliases/mdns-aliases.sh|' \
+		mdns-aliases/mdns-aliases.service \
+		| sudo tee /etc/systemd/system/mdns-aliases.service >/dev/null
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now mdns-aliases.service
 

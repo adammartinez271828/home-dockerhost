@@ -8,7 +8,8 @@ Wants=network-online.target
 Type=simple
 # Override the advertised IP here if the Pi's reserved address ever changes.
 # Environment=MDNS_IP=192.168.86.197
-ExecStart=/home/pi/devel/home-dockerhost/mdns-aliases/mdns-aliases.sh
+# ExecStart is rewritten to this repo's absolute path by `make mdns-install`.
+ExecStart=/path/to/repo/mdns-aliases/mdns-aliases.sh
 Restart=on-failure
 RestartSec=5
 
