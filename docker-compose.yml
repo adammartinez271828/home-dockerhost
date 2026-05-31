@@ -1,67 +1,18 @@
 services:
 
-  nginx-proxy-manager:
-    container_name: con_nginx-proxy-manager
-    image: jc21/nginx-proxy-manager:latest
-    # image: 0be5f593d87f  # current image
+  # Reverse proxy / network entrypoint. Owns host port 80 and routes by
+  # hostname (Host: header) to the service containers over the internal
+  # network. Plain HTTP only — see Caddyfile.
+  caddy:
+    container_name: con_caddy
+    image: caddy:2-alpine
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "/bin/check-health"]
-      interval: 10s
-      timeout: 3s
     ports:
       - '80:80'
-      - '81:81'
-      - '443:443'
     volumes:
-      - ./data:/data
-      - ./letsencrypt:/etc/letsencrypt
-
-  pihole2:
-    container_name: con_pihole2
-    # image: pihole/pihole:latest
-    image: 927e98542471  # current image
-    restart: unless-stopped
-    environment:
-      DNSMASQ_LISTENING: 'all'
-      PIHOLE_DNS_: 1.1.1.2;1.0.0.2
-      TZ: 'America/New_York'
-      WEBPASSWORD: '${PW_PIHOLE}'
-      WEBTHEME: 'default-dark'
-    # For DHCP it is recommended to remove these ports and instead add: network_mode: "host"
-    ports:
-      - '53:53/tcp'
-      - '53:53/udp'
-      # - '67:67/udp' # Only required if you are using Pi-hole as your DHCP server
-      # - '80:80/tcp'
-    volumes:
-      - './etc-pihole:/etc/pihole'
-      - './etc-dnsmasq.d:/etc/dnsmasq.d'
-    # https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
-    cap_add:
-      - NET_ADMIN  # Required if you are using Pi-hole as your DHCP server, else not needed
-
-  dashy:
-    container_name: con_dashy
-    # image: lissy93/dashy
-    image: d638c03ba733
-    restart: unless-stopped
-    environment:
-      - NODE_ENV=production
-      # Specify your user ID and group ID. You can find this by running `id -u` and `id -g`
-      # - UID=1000
-      # - GID=1000
-    healthcheck:
-      test: ['CMD', 'node', '/app/services/healthcheck']
-      interval: 1m30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    # ports:
-      # - 4000:80
-    # Pass in your config file below, by specifying the path on your host machine
-    volumes:
-      - /home/pi/devel/home-dockerhost/dashy_conf.yml:/app/public/conf.yml
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
   db_recipes:
     container_name: con_db_recipes
@@ -69,7 +20,7 @@ services:
     # image: 171b3a8784df  # current image
     restart: unless-stopped
     env_file:
-      - ./.env
+      - ./env.d/recipes.env
     volumes:
       - ./postgresql:/var/lib/postgresql/data
 
@@ -81,12 +32,14 @@ services:
     depends_on:
       - db_recipes
     env_file:
-      - ./.env
+      - ./env.d/recipes.env
     volumes:
       - staticfiles:/opt/recipes/staticfiles
       - nginx_config:/opt/recipes/nginx/conf.d
       - ./mediafiles:/opt/recipes/mediafiles
 
+  # Tandoor's own nginx (static + media). No host port — Caddy fronts it
+  # internally as nginx_recipes:80.
   nginx_recipes:
     container_name: con_nginx_recipes
     image: nginx:mainline-alpine
@@ -95,9 +48,7 @@ services:
     depends_on:
       - web_recipes
     env_file:
-      - ./.env
-    # ports:
-      # - 80:80
+      - ./env.d/recipes.env
     volumes:
       - nginx_config:/etc/nginx/conf.d:ro
       - staticfiles:/static:ro
@@ -106,6 +57,8 @@ services:
 volumes:
   nginx_config:
   staticfiles:
+  caddy_data:
+  caddy_config:
 
 networks:
   default:

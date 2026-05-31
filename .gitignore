@@ -1,6 +1,14 @@
+# secrets / per-service env (keep the .example templates)
 .env
+env.d/*.env
+!env.d/*.env.example
+
+# service data / bind mounts
 data
 etc-dnsmasq.d
 etc-pihole
 mediafiles
+postgresql
+postgresql.bak
+backups
 dashy_conf.yml
