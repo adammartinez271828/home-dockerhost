@@ -8,6 +8,8 @@ services:
     image: caddy:2.11.3-alpine
     # image: caddy@sha256:86deaf5e3d3408a6ccec08fbb79989783dd26e206ae10bcf78a801dc8c9ab794  # current image
     restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 32m
     ports:
       - '80:80'
     volumes:
@@ -20,6 +22,8 @@ services:
     image: postgres:16.8-alpine
     # image: postgres@sha256:3b057e1c2c6dfee60a30950096f3fab33be141dbb0fdd7af3d477083de94166c  # current image
     restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 128m
     env_file:
       - ./env.d/recipes.env
     volumes:
@@ -37,6 +41,8 @@ services:
     image: vabene1111/recipes:1.5.33
     # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # current image
     restart: unless-stopped
+    mem_limit: 512m
+    mem_reservation: 256m
     depends_on:
       db_recipes:
         condition: service_healthy
@@ -54,6 +60,8 @@ services:
     image: nginx:1.27.4-alpine
     # image: nginx@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591  # current image
     restart: unless-stopped
+    mem_limit: 64m
+    mem_reservation: 16m
     depends_on:
       - web_recipes
     env_file:
