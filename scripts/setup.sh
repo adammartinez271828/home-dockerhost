@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+# One-time provisioning for a fresh Debian/Pi dockerhost. Run once as root.
+# Uses bash features ([[ ]], echo -e), so it must not be invoked via /bin/sh.
 
 set -ex
 
@@ -6,12 +8,19 @@ set -ex
 if [[ `tail /etc/profile` != *neofetch* ]]; then
 	echo -e "\n\nneofetch\n" >> /etc/profile
 fi
-cat /etc/motd >> /etc/motd.old
-rm /etc/motd
-touch /etc/motd
+# archive then blank the default motd (idempotent: only if motd has content)
+if [ -s /etc/motd ]; then
+	cat /etc/motd >> /etc/motd.old
+	: > /etc/motd
+fi
 
-# set config on a pi to allow docker to see app memory
-echo -n " cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory" >> /boot/cmdline.txt
+# set config on a pi to allow docker to see app memory (idempotent: append once).
+# On Bookworm this file lives at /boot/firmware/cmdline.txt.
+CMDLINE=/boot/cmdline.txt
+[ -f /boot/firmware/cmdline.txt ] && CMDLINE=/boot/firmware/cmdline.txt
+if ! grep -q cgroup_memory "$CMDLINE"; then
+	echo -n " cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory" >> "$CMDLINE"
+fi
 
 # update
 apt update

@@ -46,7 +46,7 @@ make update        # pull newer images and re-up
 
 ## Recipes DB upgrade / migration
 
-`db-migration-commands.txt` is the runbook for a Postgres major-version bump (dump → swap data dir → restore). `pg_extract.sh <dump> <dbname>` slices a single database out of a `pg_dumpall` output. Note the dump/restore commands use `-U djangouser` / `-d djangouser` with db `djangodb`; the user/db names are easy to transpose, so copy them verbatim from the runbook.
+`db-migration-commands.txt` is the runbook for a Postgres major-version bump (dump → swap data dir → restore). `pg_extract.sh <dump> <dbname>` slices a single database out of a `pg_dumpall` output. Note the dump/restore commands use `-U djangouser` (role) / `-d djangodb` (database); the user/db names are easy to transpose, so copy them verbatim from the runbook.
 
 ## Host provisioning
 
