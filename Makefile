@@ -2,10 +2,11 @@
 # `make` or `make help` lists targets.
 
 COMPOSE := docker compose
+BACKUP_KEEP_DAYS ?= 30
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart pull update ps logs caddy-reload \
-        mdns-install mdns-restart mdns-status backup-db
+        mdns-install mdns-restart mdns-status backup-db backup-prune
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -14,8 +15,8 @@ help: ## Show this help
 up: ## Start / refresh the whole stack
 	$(COMPOSE) up -d
 
-down: ## Stop and remove the stack
-	$(COMPOSE) down
+down: ## Stop and remove the stack (and any orphaned containers)
+	$(COMPOSE) down --remove-orphans
 
 restart: ## Restart all services
 	$(COMPOSE) restart
@@ -49,3 +50,7 @@ backup-db: ## Dump the recipes Postgres DB into backups/
 	@mkdir -p backups
 	$(COMPOSE) exec -T db_recipes pg_dumpall -U djangouser > backups/recipes-`date +%Y%m%d-%H%M%S`.sql
 	@echo "Wrote backup to backups/"
+
+backup-prune: ## Delete DB backups older than BACKUP_KEEP_DAYS (default 30)
+	@find backups -name 'recipes-*.sql' -type f -mtime +$(BACKUP_KEEP_DAYS) -print -delete 2>/dev/null || true
+	@echo "Pruned backups older than $(BACKUP_KEEP_DAYS) days"
