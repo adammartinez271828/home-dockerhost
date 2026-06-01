@@ -12,3 +12,5 @@ postgresql
 postgresql.bak
 backups
 dashy_conf.yml
+smokeping
+speedtest

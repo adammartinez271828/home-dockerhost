@@ -36,6 +36,15 @@ All share the external bridge network `network_landockernet` and are prefixed `c
 - **recipes** — a 3-container [Tandoor Recipes](https://github.com/vabene1111/recipes)
   deployment: `db_recipes` (Postgres 16) + `web_recipes` (Django/gunicorn) +
   `nginx_recipes` (static/media server). Fronted by Caddy as `recipes.local`.
+- **smokeping** — continuous latency + packet-loss grapher
+  ([SmokePing](https://oss.oetiker.ch/smokeping/)). Pings WAN / gateway / DNS
+  targets and renders RRD jitter graphs. Fronted by Caddy as `smokeping.local`
+  (the bare host redirects to SmokePing's `/smokeping/smokeping.cgi`). Edit
+  probe targets in `smokeping/config/Targets`. No secrets.
+- **speedtest** — scheduled Ookla speedtests → download/upload/latency history
+  ([Speedtest Tracker](https://github.com/alexjustesen/speedtest-tracker)).
+  Fronted by Caddy as `speedtest.local`. Needs `env.d/speedtest.env` (an
+  `APP_KEY` secret — copy from `speedtest.env.example` and generate the key).
 
 ## Setup on the Pi
 

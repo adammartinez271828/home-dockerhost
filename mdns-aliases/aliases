@@ -5,4 +5,5 @@
 # After editing: `make mdns-restart`.
 
 recipes.local
-# monitor.local
+smokeping.local
+speedtest.local
