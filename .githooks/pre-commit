@@ -25,11 +25,19 @@ fi
 # --- docker compose config: validate the stack definition ---
 if docker compose version >/dev/null 2>&1; then
 	# `config` requires every env_file target to exist. On a secret-less
-	# checkout the real env.d/recipes.env is absent (gitignored), so fall back
-	# to the committed example just for the check, and remove it on exit.
-	if [ ! -f env.d/recipes.env ] && [ -f env.d/recipes.env.example ]; then
-		cp env.d/recipes.env.example env.d/recipes.env
-		trap 'rm -f env.d/recipes.env' EXIT
+	# checkout the real env.d/*.env files are absent (gitignored), so fall back
+	# to each committed *.env.example just for the check, removing them on exit.
+	created=()
+	for ex in env.d/*.env.example; do
+		[ -e "$ex" ] || continue          # no examples: nothing to do
+		real="${ex%.example}"
+		if [ ! -f "$real" ]; then
+			cp "$ex" "$real"
+			created+=("$real")
+		fi
+	done
+	if [ "${#created[@]}" -gt 0 ]; then
+		trap 'rm -f "${created[@]}"' EXIT
 	fi
 	if docker compose config -q; then
 		echo "pre-commit: docker compose config OK"

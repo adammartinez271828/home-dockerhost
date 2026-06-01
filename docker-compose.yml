@@ -13,7 +13,12 @@ services:
     ports:
       - '80:80'
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Mount the DIRECTORY, not ./caddy/Caddyfile directly. A single-file bind
+      # mount pins the host inode at create time, so a `git pull` (which writes
+      # a new inode) leaves the container reading the old file and `make
+      # caddy-reload` silently no-ops. A directory mount resolves the filename
+      # live, so reloads pick up edits. Keep it a dir mount.
+      - ./caddy:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config
 
@@ -70,6 +75,45 @@ services:
       - nginx_config:/etc/nginx/conf.d:ro
       - staticfiles:/static:ro
       - ./mediafiles:/media:ro
+
+  # SmokePing — continuous latency + packet-loss grapher; the dockerized
+  # successor to the host-side ~/netmon kit. Pings WAN / AT&T gateway / Nest /
+  # DNS every few seconds and renders RRD graphs (jitter "smoke" band). No
+  # secrets, so its non-secret PUID/PGID/TZ live inline rather than in env.d.
+  # Web UI is served at /smokeping/smokeping.cgi — Caddy redirects the bare
+  # host there (see caddy/Caddyfile). Probe list is the tracked smokeping/Targets
+  # file; apply changes with `make smokeping-targets`.
+  smokeping:
+    container_name: con_smokeping
+    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls172
+    # on first deploy, record the pulled digest here for rollback:
+    # image: lscr.io/linuxserver/smokeping@sha256:...  # current image
+    restart: unless-stopped
+    mem_limit: 128m
+    mem_reservation: 32m
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+    volumes:
+      - ./smokeping/config:/config
+      - ./smokeping/data:/data
+
+  # Speedtest Tracker — scheduled Ookla speedtests → download/upload/latency
+  # history with a web dashboard. APP_KEY is a secret, so config lives in
+  # env.d/speedtest.env (gitignored; copy from speedtest.env.example).
+  speedtest:
+    container_name: con_speedtest
+    image: lscr.io/linuxserver/speedtest-tracker:v1.14.3-ls155
+    # on first deploy, record the pulled digest here for rollback:
+    # image: lscr.io/linuxserver/speedtest-tracker@sha256:...  # current image
+    restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 64m
+    env_file:
+      - ./env.d/speedtest.env
+    volumes:
+      - ./speedtest/config:/config
 
 volumes:
   nginx_config:

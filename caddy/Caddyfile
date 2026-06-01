@@ -10,7 +10,12 @@ http://recipes.local {
 	reverse_proxy nginx_recipes:80
 }
 
-# Example for the upcoming network-monitoring service:
-# http://monitor.local {
-# 	reverse_proxy con_monitor:<port>
-# }
+http://smokeping.local {
+	# SmokePing's UI lives at /smokeping/smokeping.cgi; send the bare host there.
+	redir / /smokeping/smokeping.cgi
+	reverse_proxy smokeping:80
+}
+
+http://speedtest.local {
+	reverse_proxy speedtest:80
+}

@@ -1,0 +1,44 @@
+# SmokePing probe targets — tracked source of truth.
+# Apply to the running prober with:  make smokeping-targets
+# (that copies this file into the gitignored runtime config dir and restarts
+# SmokePing, which re-reads its config on start). Editing the runtime copy
+# directly works too, but changes there are not version-controlled.
+#
+# Syntax: `+` opens a menu section, `++` defines a host to probe. `probe`
+# selects a prober defined in the runtime `Probes` file (FPing ships by default).
+
+*** Targets ***
+
+probe = FPing
+
+menu = Top
+title = Network Latency Monitoring
+remark = WAN / gateway / LAN latency, measured from the Pi (dockerhost).
+
++ internet
+menu = Internet (WAN)
+title = Internet targets
+
+++ google_dns
+menu = Google DNS
+title = Google DNS (8.8.8.8)
+host = 8.8.8.8
+
+++ cloudflare_dns
+menu = Cloudflare DNS
+title = Cloudflare DNS (1.1.1.1)
+host = 1.1.1.1
+
++ path
+menu = Gateway / LAN
+title = First hops
+
+++ att_gateway
+menu = AT&T gateway
+title = AT&T residential gateway (192.168.1.254)
+host = 192.168.1.254
+
+++ nest
+menu = Nest router
+title = Google Nest (192.168.86.1)
+host = 192.168.86.1
