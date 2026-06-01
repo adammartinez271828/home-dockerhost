@@ -6,6 +6,7 @@ BACKUP_KEEP_DAYS ?= 30
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart pull update ps logs caddy-reload \
+        smokeping-targets \
         mdns-install mdns-restart mdns-status backup-db backup-prune \
         dev-setup
 
@@ -33,8 +34,14 @@ ps: ## Show service status
 logs: ## Follow logs (all, or one service: make logs S=caddy)
 	$(COMPOSE) logs -f $(S)
 
-caddy-reload: ## Reload Caddy after editing the Caddyfile (no downtime)
+caddy-reload: ## Reload Caddy after editing caddy/Caddyfile (no downtime)
 	$(COMPOSE) exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+smokeping-targets: ## Apply tracked smokeping/Targets to the prober and restart it
+	@test -d smokeping/config || { echo "smokeping/config not found - run 'make up' first so SmokePing creates it"; exit 1; }
+	cp smokeping/Targets smokeping/config/Targets
+	$(COMPOSE) restart smokeping
+	@echo "Applied smokeping/Targets and restarted SmokePing"
 
 mdns-install: ## Install + enable the mDNS alias service (one-time, sudo)
 	sed 's|^ExecStart=.*|ExecStart=$(CURDIR)/mdns-aliases/mdns-aliases.sh|' \

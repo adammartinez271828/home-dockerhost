@@ -17,7 +17,7 @@ Two layers give you `http://recipes.local` instead of a bare IP:
    by the OS (macOS/iOS natively, Linux via `nss-mdns`) and **never touches
    NextDNS or the router's DNS** — no local-DNS server needed.
 2. **HTTP routing — Caddy.** Caddy is the only container that binds a host port
-   (`:80`). It routes by `Host:` header (see `Caddyfile`) to each service over
+   (`:80`). It routes by `Host:` header (see `caddy/Caddyfile`) to each service over
    the internal Docker network; the services publish no host ports themselves.
 
 ```
@@ -39,8 +39,9 @@ All share the external bridge network `network_landockernet` and are prefixed `c
 - **smokeping** — continuous latency + packet-loss grapher
   ([SmokePing](https://oss.oetiker.ch/smokeping/)). Pings WAN / gateway / DNS
   targets and renders RRD jitter graphs. Fronted by Caddy as `smokeping.local`
-  (the bare host redirects to SmokePing's `/smokeping/smokeping.cgi`). Edit
-  probe targets in `smokeping/config/Targets`. No secrets.
+  (the bare host redirects to SmokePing's `/smokeping/smokeping.cgi`). Probe
+  targets are the tracked `smokeping/Targets`; run `make smokeping-targets` to
+  apply them. No secrets.
 - **speedtest** — scheduled Ookla speedtests → download/upload/latency history
   ([Speedtest Tracker](https://github.com/alexjustesen/speedtest-tracker)).
   Fronted by Caddy as `speedtest.local`. Needs `env.d/speedtest.env` (an
@@ -69,7 +70,7 @@ A `Makefile` wraps the routine operations (run `make` to list them):
 ```sh
 make up            # bring the whole stack up
 make logs S=caddy  # follow logs for one service
-make caddy-reload  # apply Caddyfile changes with no downtime
+make caddy-reload  # apply caddy/Caddyfile changes with no downtime
 make mdns-restart  # re-publish after editing mdns-aliases/aliases
 make backup-db     # dump the recipes Postgres DB into backups/
 make update        # pull newer images and re-up
@@ -96,7 +97,7 @@ Three explicit edits (no auto-discovery):
 
 1. **`docker-compose.yml`** — add the container on `network_landockernet` with
    **no host port**; give it `env.d/<name>.env` if it needs config.
-2. **`Caddyfile`** — add `http://<name>.local { reverse_proxy <container>:<port> }`,
+2. **`caddy/Caddyfile`** — add `http://<name>.local { reverse_proxy <container>:<port> }`,
    then `make caddy-reload`.
 3. **`mdns-aliases/aliases`** — add `<name>.local`, then `make mdns-restart`.
 
@@ -105,7 +106,8 @@ Three explicit edits (no auto-discovery):
 | Path | What it is |
 | --- | --- |
 | `docker-compose.yml` | the service stack |
-| `Caddyfile` | reverse-proxy host→container routing |
+| `caddy/Caddyfile` | reverse-proxy host→container routing (dir is bind-mounted) |
+| `smokeping/Targets` | tracked SmokePing probe list (`make smokeping-targets` to apply) |
 | `env.d/` | per-service env files (`*.env` gitignored, `*.env.example` tracked) |
 | `mdns-aliases/` | mDNS `.local` publisher: `aliases` list, script, systemd unit |
 | `Makefile` | common lifecycle commands |

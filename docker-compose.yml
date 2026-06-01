@@ -13,7 +13,12 @@ services:
     ports:
       - '80:80'
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Mount the DIRECTORY, not ./caddy/Caddyfile directly. A single-file bind
+      # mount pins the host inode at create time, so a `git pull` (which writes
+      # a new inode) leaves the container reading the old file and `make
+      # caddy-reload` silently no-ops. A directory mount resolves the filename
+      # live, so reloads pick up edits. Keep it a dir mount.
+      - ./caddy:/etc/caddy:ro
       - caddy_data:/data
       - caddy_config:/config
 
@@ -76,7 +81,8 @@ services:
   # DNS every few seconds and renders RRD graphs (jitter "smoke" band). No
   # secrets, so its non-secret PUID/PGID/TZ live inline rather than in env.d.
   # Web UI is served at /smokeping/smokeping.cgi — Caddy redirects the bare
-  # host there (see Caddyfile). Edit targets in ./smokeping/config/Targets.
+  # host there (see caddy/Caddyfile). Probe list is the tracked smokeping/Targets
+  # file; apply changes with `make smokeping-targets`.
   smokeping:
     container_name: con_smokeping
     image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls172

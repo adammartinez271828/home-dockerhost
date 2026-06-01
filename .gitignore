@@ -12,5 +12,8 @@ postgresql
 postgresql.bak
 backups
 dashy_conf.yml
-smokeping
-speedtest
+# SmokePing/Speedtest runtime data (RRDs, SQLite, generated config). The
+# tracked smokeping/Targets is the source of truth — see `make smokeping-targets`.
+smokeping/config
+smokeping/data
+speedtest/config
