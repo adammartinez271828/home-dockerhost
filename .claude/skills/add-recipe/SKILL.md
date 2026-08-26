@@ -183,9 +183,28 @@ Do this for URL imports and transcriptions alike. For a transcription you can go
 put the JSON-LD's `recipeInstructions` in the intended step granularity up front — the
 ingredients will still all land in step 1 and need distributing.
 
-To restructure a recipe that is already in Tandoor: `tandoor.py get <id> -o r.json`, edit
-`steps` the same way (drop the `id` from steps and ingredients you move so they're re-created;
-the old ones are removed), then `tandoor.py update r.json`.
+To restructure recipes that are already in Tandoor, use `restructure.py` with a plan file
+(`--dry` first — it asserts every ingredient lands in exactly one step and every paragraph is
+used unless `allow_dropped_paras`):
+
+```json
+{"11": {"servings_text": "Servings", "steps": [
+   ["Coat the Chicken",   ["literal sentence(s) …"], [2, 3, 4]],
+   ["Layer and Pressure Cook", [3, 4],                [9, 10]] ]}}
+```
+
+Each step is `[name, text_spec, ingredient_numbers]`: text_spec mixes 1-based paragraph
+indices (flattened across the recipe's existing steps, split on newlines) and literal strings;
+ingredient numbers are 1-based across the existing steps in order. Dump a recipe's numbered
+ingredients/paragraphs first (see `tandoor.py get`) to write the plan. Leave the user's own
+hand-built two-phase recipes (e.g. marinate-today / roast-tomorrow) alone even if the second
+phase has no ingredients — that split is deliberate.
+
+**If a recipe PUT/POST returns HTTP 500 with an empty body**, bisect the keywords: Tandoor's
+uniqueness check breaks when two keywords differ only by whitespace/case (`' mexican'` vs
+`'mexican'` — imports create the space-prefixed ones). Fix with the lossless merge endpoint,
+`PUT /api/keyword/<dup_id>/merge/<clean_id>/`, never DELETE. Foods and units have the same
+merge endpoint.
 
 ### 3. Create
 
