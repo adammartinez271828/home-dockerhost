@@ -206,6 +206,11 @@ uniqueness check breaks when two keywords differ only by whitespace/case (`' mex
 `PUT /api/keyword/<dup_id>/merge/<clean_id>/`, never DELETE. Foods and units have the same
 merge endpoint.
 
+Tandoor requests are **not atomic**: a POST/PUT that returns 500 may still have created or
+modified the recipe before crashing. After any 500, GET the recipe (or `search ZZ-TEMP`) to
+see what actually landed, and prefix any throwaway test recipes with `ZZ-TEMP` so they're
+easy to find and delete.
+
 ### 3. Create
 
 - URL import that parsed cleanly, was restructured per 2b, and isn't a duplicate → create right away.
