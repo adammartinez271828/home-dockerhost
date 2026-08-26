@@ -127,9 +127,12 @@ rest into `note`. Do this before `create`; fixing afterwards leaves orphan Food 
 
 **Never DELETE a Food or Unit via the API.** `Ingredient.food` is `on_delete=CASCADE` (deleting a
 food deletes every ingredient line using it, in every recipe) and `Ingredient.unit` is `SET_NULL`
-(the unit silently vanishes from every recipe). The API does not refuse either. If a bad parse
-created a junk food/unit, fix the ingredient (`food: {"name": …}`, `unit: null`) and leave the
-orphan entry alone — Tandoor's UI can merge/clean unused foods later. Also note the parser
+(the unit silently vanishes from every recipe). The API does not refuse either. To fix a junk
+food name on an *existing* recipe, don't create a new food — either **rename in place**
+(`PATCH /api/food/<id>/ {"name": …}`, when the malformed food is used only by that line and no
+canonical food exists) or **merge** into the existing canonical food
+(`PUT /api/food/<bad_id>/merge/<canonical_id>/`, which re-points every ingredient first). Then
+`PATCH /api/ingredient/<id>/ {"note": …}` to park the qualifier. Same for units. Also note the parser
 treats size words as units (`2 medium onions` → unit `medium`, `2 chicken carcasses` → unit
 `chicken`); `medium`/`small`/`large` as units is the existing house convention (recipe 14),
 so keep those and only null out real nonsense like `chicken` or `dried`.
