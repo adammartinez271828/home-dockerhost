@@ -133,8 +133,9 @@ food name on an *existing* recipe, don't create a new food — either **rename i
 canonical food exists) or **merge** into the existing canonical food
 (`PUT /api/food/<bad_id>/merge/<canonical_id>/`, which re-points every ingredient first). Then
 `PATCH /api/ingredient/<id>/ {"note": …}` to park the qualifier. Same for units. Also note the parser
-treats size words as units (`2 medium onions` → unit `medium`, `2 chicken carcasses` → unit
-`chicken`); `medium`/`small`/`large` as units is the existing house convention (recipe 14),
+treats the word after a bare number as the unit (`2 medium onions` → unit `medium`,
+`4 chicken thighs` → unit `chicken` + food `thighs`, `2 dried bay leaves` → unit `dried`) — scan
+the preview for these **before `create`**, since `create` persists the junk unit; `medium`/`small`/`large` as units is the existing house convention (recipe 14),
 so keep those and only null out real nonsense like `chicken` or `dried`.
 
 **Recipe Notes** (variations, storage) aren't in JSON-LD — grab them from the page when
