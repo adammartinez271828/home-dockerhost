@@ -123,7 +123,16 @@ but leaks qualifiers into `food.name` on complex lines — e.g. `thick-cut bacon
 `yellow onion, diced`, or a whole `small beans, such as navy, pinto…, drained and rinsed`.
 Each Food becomes a reusable entry in Tandoor's food list, so keep names canonical: set
 `food` to `{"name": "yellow onion"}` (no `id` — it's looked up/created by name) and move the
-rest into `note`. Do this before `create`; fixing afterwards leaves orphan Food entries.
+rest into `note`. Do this before `create`; fixing afterwards leaves orphan Food entries (harmless — never delete them, see below).
+
+**Never DELETE a Food or Unit via the API.** `Ingredient.food` is `on_delete=CASCADE` (deleting a
+food deletes every ingredient line using it, in every recipe) and `Ingredient.unit` is `SET_NULL`
+(the unit silently vanishes from every recipe). The API does not refuse either. If a bad parse
+created a junk food/unit, fix the ingredient (`food: {"name": …}`, `unit: null`) and leave the
+orphan entry alone — Tandoor's UI can merge/clean unused foods later. Also note the parser
+treats size words as units (`2 medium onions` → unit `medium`, `2 chicken carcasses` → unit
+`chicken`); `medium`/`small`/`large` as units is the existing house convention (recipe 14),
+so keep those and only null out real nonsense like `chicken` or `dried`.
 
 **Recipe Notes** (variations, storage) aren't in JSON-LD — grab them from the page when
 available and append to the last step as `**Notes**` followed by `*Label:* text` paragraphs
