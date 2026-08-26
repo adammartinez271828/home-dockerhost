@@ -49,6 +49,10 @@ make update        # pull newer images and re-up
 make dev-setup     # enable the pre-commit hook + check dev tooling (per clone)
 ```
 
+## Claude Code skills
+
+`.claude/skills/add-recipe/` — imports a recipe into Tandoor from a URL, pasted text, or a photo/PDF via the REST API (`tandoor.py` wraps `/api/recipe-from-source/` → `/api/recipe/`). Needs a Tandoor API token in `env.d/tandoor-api.env` (gitignored; template committed) on the machine running the skill — it talks to `recipes.local` directly, not through the Pi.
+
 ## Recipes DB upgrade / migration
 
 `db-migration-commands.txt` is the runbook for a Postgres major-version bump (dump → swap data dir → restore). `pg_extract.sh <dump> <dbname>` slices a single database out of a `pg_dumpall` output. Note the dump/restore commands use `-U djangouser` (role) / `-d djangodb` (database); the user/db names are easy to transpose, so copy them verbatim from the runbook.
