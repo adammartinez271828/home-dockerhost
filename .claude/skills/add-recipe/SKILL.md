@@ -229,6 +229,12 @@ Prints the recipe id and link (`http://recipes.local/view/recipe/<id>`). Report 
 Use `--no-image` to skip the image, or set one afterwards:
 `tandoor.py image <id> --url "https://…"` / `--file photo.jpg`.
 
+### Export as Markdown
+
+`tandoor.py markdown <id> [<id>…]` prints a recipe as Markdown (title, description, servings/times,
+source, a combined ingredient list grouped by step, then the directions per step); `-o DIR` writes
+one `<slug>.md` per recipe instead. Use it when the user wants to share or copy-paste a recipe.
+
 ### Undo
 
 `tandoor.py delete <id>` removes a recipe. Only on the user's request (e.g. the import came

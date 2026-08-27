@@ -17,6 +17,7 @@ Subcommands:
   create FILE [--no-image]   POST the recipe_json; then attach its `image` URL if present
   image ID (--url U|--file F) set/replace a recipe's image
   get ID -o FILE             fetch an existing recipe as JSON (edit it, then `update`)
+  markdown ID [ID…] [-o DIR] render recipe(s) as Markdown (stdout, or one .md per recipe in DIR)
   update FILE                PUT an edited recipe JSON back (must contain its `id`)
   delete ID                  delete a recipe (undo a bad import)
 """
@@ -327,6 +328,78 @@ def cmd_get(a):
         print(out)
 
 
+def fmt_amount(x):
+    if not x:
+        return ""
+    fr = {0.25: "¼", 0.33: "⅓", 0.5: "½", 0.67: "⅔", 0.75: "¾", 0.125: "⅛"}
+    whole, frac = int(x), round(x - int(x), 2)
+    if frac == 0:
+        return str(whole)
+    sym = fr.get(frac) or next((v for k, v in fr.items() if abs(k - frac) < 0.02), None)
+    if sym:
+        return f"{whole} {sym}" if whole else sym
+    return f"{x:g}"
+
+
+def recipe_markdown(r):
+    out = [f"# {r['name']}", ""]
+    if r.get("description"):
+        out += [r["description"], ""]
+    meta = []
+    if r.get("servings"):
+        meta.append(f"**{r['servings']} {r.get('servings_text') or 'servings'}**")
+    if r.get("working_time"):
+        meta.append(f"{r['working_time']} min active")
+    if r.get("waiting_time"):
+        w = r["waiting_time"]
+        meta.append(f"{w // 60} h {w % 60} min hands-off" if w >= 60 else f"{w} min hands-off")
+    if meta:
+        out += [" · ".join(meta), ""]
+    if r.get("source_url"):
+        out += [f"Source: {r['source_url']}", ""]
+    steps = r.get("steps", [])
+    if len(steps) > 1:
+        # combined ingredient list up top, then per-step detail
+        out += ["## Ingredients", ""]
+        for s in steps:
+            if s.get("name") and s.get("ingredients"):
+                out.append(f"**{s['name']}**")
+            for i in s.get("ingredients", []):
+                out.append(ingredient_line(i))
+            if s.get("ingredients"):
+                out.append("")
+        out += ["## Directions", ""]
+        for n, s in enumerate(steps, 1):
+            out += [f"### {n}. {s['name']}" if s.get("name") else f"### Step {n}", ""]
+            out += [(s.get("instruction") or "").strip(), ""]
+    else:
+        s = steps[0] if steps else {"ingredients": [], "instruction": ""}
+        out += ["## Ingredients", ""] + [ingredient_line(i) for i in s.get("ingredients", [])] + ["", "## Directions", "", (s.get("instruction") or "").strip(), ""]
+    return "\n".join(out).rstrip() + "\n"
+
+
+def ingredient_line(i):
+    amt = fmt_amount(i.get("amount"))
+    unit = (i.get("unit") or {}).get("name") or ""
+    food = (i.get("food") or {}).get("name") or ""
+    line = " ".join(x for x in (amt, unit, food) if x)
+    if i.get("note"):
+        line += f" ({i['note']})"
+    return f"- {line}"
+
+
+def cmd_markdown(a):
+    for rid in a.ids:
+        r = request("GET", f"recipe/{rid}/")
+        md = recipe_markdown(r)
+        if a.output:
+            d = Path(a.output); d.mkdir(parents=True, exist_ok=True)
+            slug = re.sub(r"[^a-z0-9]+", "-", r["name"].lower()).strip("-")
+            f = d / f"{slug}.md"; f.write_text(md); print(f"wrote {f}", file=sys.stderr)
+        else:
+            print(md)
+
+
 def cmd_update(a):
     rj = json.loads(Path(a.file).read_text())
     rid = rj.get("id") or die("recipe JSON has no `id` (use `get ID` output)")
@@ -354,6 +427,7 @@ def main():
     s = sp.add_parser("image"); s.add_argument("id", type=int); g = s.add_mutually_exclusive_group(required=True)
     g.add_argument("--url"); g.add_argument("--file"); s.set_defaults(fn=cmd_image)
     s = sp.add_parser("get"); s.add_argument("id", type=int); s.add_argument("-o", "--output"); s.set_defaults(fn=cmd_get)
+    s = sp.add_parser("markdown"); s.add_argument("ids", type=int, nargs="+"); s.add_argument("-o", "--output", metavar="DIR"); s.set_defaults(fn=cmd_markdown)
     s = sp.add_parser("update"); s.add_argument("file"); s.set_defaults(fn=cmd_update)
     s = sp.add_parser("delete"); s.add_argument("id", type=int); s.set_defaults(fn=cmd_delete)
     a = p.parse_args()
