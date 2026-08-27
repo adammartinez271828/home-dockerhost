@@ -380,7 +380,7 @@ def recipe_markdown(r):
 
 def ingredient_line(i):
     amt = fmt_amount(i.get("amount"))
-    unit = (i.get("unit") or {}).get("name") or ""
+    unit = ((i.get("unit") or {}).get("name") or "") if amt else ""   # no amount -> no unit
     food = (i.get("food") or {}).get("name") or ""
     line = " ".join(x for x in (amt, unit, food) if x)
     if i.get("note"):
