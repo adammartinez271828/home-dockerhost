@@ -390,7 +390,7 @@ def ingredient_line(i):
 
 def cmd_markdown(a):
     for rid in a.ids:
-        r = request("GET", f"recipe/{rid}/")
+        r = request("GET", f"/api/recipe/{rid}/")
         md = recipe_markdown(r)
         if a.output:
             d = Path(a.output); d.mkdir(parents=True, exist_ok=True)
