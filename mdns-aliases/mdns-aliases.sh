@@ -5,6 +5,10 @@
 # this script) and publishes an mDNS address record for each, pointing at this
 # host's LAN IP. Requires avahi-utils (provides avahi-publish).
 #
+# The IP defaults to this host's own primary IPv4 (the source address the
+# kernel would use to reach the internet), so the same script works on any
+# host without editing. Set MDNS_IP in the systemd unit to override.
+#
 # Run as a long-lived process (see mdns-aliases.service): each avahi-publish
 # stays in the foreground for as long as the alias should be advertised. If any
 # one publisher dies (e.g. a name collision), we exit non-zero so systemd
@@ -14,7 +18,14 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 ALIASES_FILE="${ALIASES_FILE:-$SCRIPT_DIR/aliases}"
-IP="${MDNS_IP:-192.168.86.197}"
+detect_ip() {
+	ip -4 route get 1.1.1.1 2>/dev/null | awk '{ for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit } }'
+}
+IP="${MDNS_IP:-$(detect_ip)}"
+if [ -z "$IP" ]; then
+	echo "mdns-aliases: could not detect this host's IPv4 address; set MDNS_IP" >&2
+	exit 1
+fi
 
 pids=""
 # `|| [ -n "$name" ]` so a final line without a trailing newline isn't dropped.

@@ -6,7 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Override the advertised IP here if the Pi's reserved address ever changes.
+# The script advertises this host's own primary IPv4 by default. Uncomment to
+# pin a different address (e.g. a second interface).
 # Environment=MDNS_IP=192.168.86.197
 # ExecStart is rewritten to this repo's absolute path by `make mdns-install`.
 ExecStart=/path/to/repo/mdns-aliases/mdns-aliases.sh
