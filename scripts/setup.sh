@@ -4,9 +4,10 @@
 
 set -ex
 
-# basic config
-if [[ $(tail /etc/profile) != *neofetch* ]]; then
-	echo -e "\n\nneofetch\n" >> /etc/profile
+# basic config: system summary at login. Trixie dropped neofetch for fastfetch;
+# guard with command -v so a login never errors if the package is missing.
+if [[ $(tail /etc/profile) != *fastfetch* ]]; then
+	echo -e "\n\ncommand -v fastfetch >/dev/null && fastfetch\n" >> /etc/profile
 fi
 # archive then blank the default motd (idempotent: only if motd has content)
 if [ -s /etc/motd ]; then
@@ -26,7 +27,7 @@ fi
 apt-get update
 apt-get -y upgrade
 # also installs shellcheck for the pre-commit hook (see .githooks/); the Pi commits too
-apt-get -y install git vim neofetch ca-certificates curl gnupg avahi-daemon avahi-utils shellcheck
+apt-get -y install git vim fastfetch ca-certificates curl gnupg avahi-daemon avahi-utils shellcheck
 
 # install docker
 install -m 0755 -d /etc/apt/keyrings
