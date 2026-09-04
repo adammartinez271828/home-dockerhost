@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up the recipes DB and media to cloud storage (rclone)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# User / WorkingDirectory / ExecStart are rewritten to this clone's user and
+# absolute path by `make backup-install`.
+User=pi
+WorkingDirectory=/path/to/repo
+ExecStart=/path/to/repo/scripts/db-backup.sh --upload
+Nice=10
+IOSchedulingClass=idle

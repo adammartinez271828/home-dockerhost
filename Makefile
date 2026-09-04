@@ -1,4 +1,5 @@
 # Common operations for the home dockerhost. Run from the repo root on the Pi.
+# Backup/restore runbook: docs/backup-restore.md
 # `make` or `make help` lists targets.
 
 COMPOSE := docker compose
@@ -7,8 +8,9 @@ BACKUP_KEEP_DAYS ?= 30
 .DEFAULT_GOAL := help
 .PHONY: help up down restart pull update ps logs caddy-reload \
         smokeping-targets \
-        mdns-install mdns-restart mdns-status backup-db backup-prune \
-        dev-setup
+        mdns-install mdns-restart mdns-status \
+        backup-db backup-cloud backup-list backup-prune backup-install backup-status \
+        restore-test restore-test-clean dev-setup
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -56,14 +58,39 @@ mdns-restart: ## Restart the mDNS alias service (after editing mdns-aliases/alia
 mdns-status: ## Show mDNS alias service status
 	systemctl status mdns-aliases.service --no-pager
 
-backup-db: ## Dump the recipes Postgres DB into backups/
-	@mkdir -p backups
-	$(COMPOSE) exec -T db_recipes pg_dumpall -U djangouser > backups/recipes-`date +%Y%m%d-%H%M%S`.sql
-	@echo "Wrote backup to backups/"
+backup-db: ## Dump the recipes Postgres DB into backups/ (local only)
+	@./scripts/db-backup.sh
 
-backup-prune: ## Delete DB backups older than BACKUP_KEEP_DAYS (default 30)
-	@find backups -name 'recipes-*.sql' -type f -mtime +$(BACKUP_KEEP_DAYS) -print -delete 2>/dev/null || true
-	@echo "Pruned backups older than $(BACKUP_KEEP_DAYS) days"
+backup-cloud: ## Dump + upload to the cloud remote (what the nightly timer runs)
+	@./scripts/db-backup.sh --upload
+
+backup-list: ## List the DB dumps held on the cloud remote
+	@./scripts/db-restore.sh --list
+
+backup-prune: ## Delete local DB backups older than BACKUP_KEEP_DAYS (default 30)
+	@find backups -maxdepth 1 \( -name 'recipes-*.dump' -o -name 'recipes-*.sql' \) -type f -mtime +$(BACKUP_KEEP_DAYS) -print -delete 2>/dev/null || true
+	@echo "Pruned local backups older than $(BACKUP_KEEP_DAYS) days"
+
+backup-install: ## Install + enable the nightly cloud-backup systemd timer (one-time, sudo)
+	sed -e 's|^User=.*|User=$(shell id -un)|' \
+	    -e 's|^WorkingDirectory=.*|WorkingDirectory=$(CURDIR)|' \
+	    -e 's|^ExecStart=.*|ExecStart=$(CURDIR)/scripts/db-backup.sh --upload|' \
+	    cloud-backup/cloud-backup.service \
+	    | sudo tee /etc/systemd/system/cloud-backup.service >/dev/null
+	sudo cp cloud-backup/cloud-backup.timer /etc/systemd/system/cloud-backup.timer
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now cloud-backup.timer
+	systemctl list-timers cloud-backup.timer --no-pager
+
+backup-status: ## Show the backup timer's next run and the last run's log
+	@systemctl list-timers cloud-backup.timer --no-pager
+	@journalctl -u cloud-backup.service -n 30 --no-pager
+
+restore-test: ## Fetch the newest cloud dump and restore it into a throwaway DB container (F=file or N=name to pick one)
+	@if [ -n "$(F)" ]; then ./scripts/db-restore.sh "$(F)"; else ./scripts/db-restore.sh --from-cloud $(N); fi
+
+restore-test-clean: ## Remove the throwaway restore-test DB container
+	docker rm -f con_db_restoretest
 
 dev-setup: ## Set up a dev clone: enable pre-commit hooks + check tooling (one-time)
 	@./scripts/dev-setup.sh

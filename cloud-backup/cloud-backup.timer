@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly cloud backup of the recipes stack
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# Run soon after boot if the 03:30 slot was missed (Pi was off).
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target

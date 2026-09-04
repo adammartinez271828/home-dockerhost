@@ -44,10 +44,31 @@ make caddy-reload  # apply caddy/Caddyfile changes with no downtime
 make smokeping-targets # apply smokeping/Targets and restart the prober
 make mdns-install  # install + enable the mDNS alias service (one-time, sudo)
 make mdns-restart  # re-publish after editing mdns-aliases/aliases
-make backup-db     # dump the recipes Postgres DB into backups/
+make backup-db     # dump the recipes Postgres DB into backups/ (local only)
+make backup-cloud  # dump + upload to Google Drive (what the nightly timer runs)
+make backup-list   # list dumps on the cloud remote
+make restore-test  # restore newest cloud dump into throwaway con_db_restoretest, print counts
+make backup-install # install + enable the nightly cloud-backup systemd timer (sudo)
 make update        # pull newer images and re-up
 make dev-setup     # enable the pre-commit hook + check dev tooling (per clone)
 ```
+
+## Cloud backup / restore
+
+Runbook: `docs/backup-restore.md`. `scripts/db-backup.sh` dumps `djangodb` with
+`pg_dump -Fc` into `backups/`; `--upload` rclones it to `$RCLONE_REMOTE` (a
+plain Google Drive folder via a `drive.file`-scoped remote — deliberately
+unencrypted; the user judged the data non-sensitive), keeps the first dump of
+each month, `rclone copy`s (never `sync`s) `mediafiles/` (and `env.d/` only if
+`BACKUP_ENV=1`, since those hold real secrets), and prunes the remote only
+after the upload is size-verified.
+Config is `env.d/backup.env`; the nightly `cloud-backup.timer` is installed
+by `make backup-install`. `scripts/db-restore.sh` restores into a throwaway
+`con_db_restoretest` container by default and only touches the live DB with
+`--live` (typed confirmation, safety dump first). Never point a restore at the
+live DB for testing — use `make restore-test`. The rclone remote is created
+on a machine with a browser by `scripts/backup-setup-rclone.sh` and copied to
+the Pi.
 
 ## Claude Code skills
 

@@ -73,8 +73,16 @@ make logs S=caddy  # follow logs for one service
 make caddy-reload  # apply caddy/Caddyfile changes with no downtime
 make mdns-restart  # re-publish after editing mdns-aliases/aliases
 make backup-db     # dump the recipes Postgres DB into backups/
+make backup-cloud  # dump + upload to Google Drive (nightly timer runs this)
+make restore-test  # restore the newest cloud dump into a throwaway DB and show counts
 make update        # pull newer images and re-up
 ```
+
+## Backups
+
+The recipes DB and `mediafiles/` are backed up nightly to Google Drive with
+rclone, with a restore drill that never touches the live DB. Setup, daily use, and the real-restore runbook are in
+[`docs/backup-restore.md`](docs/backup-restore.md).
 
 ## Local checks (pre-commit)
 
@@ -114,6 +122,11 @@ Three explicit edits (no auto-discovery):
 | `scripts/setup.sh` | one-time host bootstrap (Docker CE, log rotation, cgroup flags, pre-commit hook) |
 | `scripts/dev-setup.sh` | dev-clone bootstrap: enable pre-commit hook + check tooling |
 | `.githooks/` | git hooks (pre-commit: shellcheck + `docker compose config`) |
+| `scripts/db-backup.sh` | dump the DB; `--upload` ships it (+ media) to the cloud remote |
+| `scripts/db-restore.sh` | restore a dump into a throwaway DB (default) or, with `--live`, the real one |
+| `scripts/backup-setup-rclone.sh` | one-time creation of the `gdrive-backup` rclone remote |
+| `cloud-backup/` | systemd service + timer for the nightly backup (`make backup-install`) |
+| `docs/backup-restore.md` | backup & restore runbook |
 | `scripts/pg_extract.sh` | slice one DB out of a `pg_dumpall` dump |
 | `docs/db-migration.md` | Postgres major-version upgrade runbook |
 | `CLAUDE.md` | guidance for Claude Code in this repo |
