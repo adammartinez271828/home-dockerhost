@@ -28,24 +28,40 @@ rclone — or even just the Drive web UI.
 
 ## One-time setup
 
-### 1. On your laptop (has a browser)
+### 1. On your desktop (has a browser)
+
+First you need your own Google OAuth client: rclone's built-in shared
+`client_id` is being retired during 2026 and rclone prints a NOTICE on every
+run until you stop using it. Follow
+<https://rclone.org/drive/#making-your-own-client-id> (Google Cloud console →
+enable the Drive API → OAuth consent screen, External, add yourself as a test
+user → create an OAuth client of type **Desktop app** → *Publish app*, so the
+refresh token doesn't expire after 7 days). Only the `drive.file` scope is
+needed, which is non-sensitive, so no app verification is required. An
+existing Desktop-app client from another rclone remote can be reused.
 
 ```sh
-./scripts/backup-setup-rclone.sh
+GDRIVE_CLIENT_ID=...apps.googleusercontent.com GDRIVE_CLIENT_SECRET=... \
+  ./scripts/backup-setup-rclone.sh
 ```
 
 Creates the `gdrive-backup` remote (opens Google sign-in) and does a
 write/read/delete round trip in `dockerhost-backups/`. Safe to re-run; it
-keeps an existing remote.
+keeps an existing remote, or upgrades one that still uses the shared
+client (re-opens sign-in). Note that `drive.file` access is per OAuth
+client: after switching clients the remote no longer sees files uploaded
+under the old one, so move or delete the old `dockerhost-backups` folder in
+the Drive web UI first or you get two same-named folders.
 
-Then push the config section to the Pi (the script prints this too):
+Then push the config section to the Pi (the script prints this too; the
+Pi's `rclone.conf` holds only this remote, so overwrite it):
 
 ```sh
 rclone config show gdrive-backup \
-  | ssh pi@dockerhost 'mkdir -p ~/.config/rclone && cat >> ~/.config/rclone/rclone.conf && chmod 600 ~/.config/rclone/rclone.conf'
+  | ssh pi@dockerhost 'mkdir -p ~/.config/rclone && cat > ~/.config/rclone/rclone.conf && chmod 600 ~/.config/rclone/rclone.conf'
 ```
 
-Keeping the same remote on the laptop means you can list and restore
+Keeping the same remote on the desktop means you can list and restore
 backups from there too (`scripts/db-restore.sh --list`), which is exactly what
 you'd do if the Pi were dead.
 
@@ -102,7 +118,7 @@ The container is left running so you can poke at it
 (`docker exec -it con_db_restoretest psql -U djangouser -d djangodb`); remove
 it with `make restore-test-clean`. Add `--rm` to the script to auto-remove.
 
-This works on the laptop as well (needs Docker + the rclone remote); the
+This works on the desktop as well (needs Docker + the rclone remote); the
 live column is simply omitted.
 
 ## Real restore
@@ -129,11 +145,15 @@ migrations forward again with `make up`.
 
 1. Provision the host (`README.md` → *Setup on the Pi*, `scripts/setup.sh`),
    clone this repo, `curl -fsSL https://rclone.org/install.sh | sudo bash`.
-2. Put the `gdrive-backup` remote on the new host — copy it from the laptop
-   as in setup step 1. (If the laptop is gone too: `rclone config create
-   gdrive-backup drive scope=drive.file config_is_local=false` and paste the
-   token from `rclone authorize "drive" '{"scope":"drive.file"}'` run on any
-   machine with a browser.) Check with `rclone lsl gdrive-backup:dockerhost-backups/db/daily`.
+2. Put the `gdrive-backup` remote on the new host — copy it from the desktop
+   as in setup step 1. (If the desktop is gone too: `rclone config create
+   gdrive-backup drive scope=drive.file client_id=... client_secret=...
+   config_is_local=false` and paste the token from
+   `rclone authorize "drive" '{"scope":"drive.file","client_id":"...","client_secret":"..."}'`
+   run on any machine with a browser. The client ID/secret are in the Google
+   Cloud console under *APIs & Services → Credentials*; the **same** client
+   must be used, since `drive.file` only sees files that client uploaded.)
+   Check with `rclone lsl gdrive-backup:dockerhost-backups/db/daily`.
 3. Recreate the env files: `cp env.d/*.env.example` → fill in
    `recipes.env` (new `SECRET_KEY`, any `POSTGRES_PASSWORD`),
    `speedtest.env` (new `APP_KEY`), `backup.env`. Existing Tandoor logins
@@ -164,7 +184,7 @@ and run `make restore-test F=<file>`.
 - **Google Drive** over Dropbox/iCloud: all three would need rclone; Drive
   and Dropbox both have mature, headless-friendly rclone backends, but
   Drive's `drive.file` scope gives least-privilege with no extra setup, you
-  already had an rclone Drive remote on the laptop, and iCloud's rclone
+  already had an rclone Drive remote on the desktop, and iCloud's rclone
   backend needs an interactive 2FA session that doesn't suit a cron job.
 - **No encryption:** recipes aren't sensitive; skipping it removes a secret
   that could be lost and lets you restore from the Drive UI alone. The
