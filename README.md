@@ -124,7 +124,7 @@ Three explicit edits (no auto-discovery):
 | `.githooks/` | git hooks (pre-commit: shellcheck + `docker compose config`) |
 | `scripts/db-backup.sh` | dump the DB; `--upload` ships it (+ media) to the cloud remote |
 | `scripts/db-restore.sh` | restore a dump into a throwaway DB (default) or, with `--live`, the real one |
-| `scripts/backup-setup-rclone.sh` | one-time creation of the `gdrive-backup` rclone remote |
+| `scripts/backup-setup-rclone.sh` | one-time creation of the `gdrive-backup` rclone remote (needs your own Google OAuth client via `GDRIVE_CLIENT_ID`/`GDRIVE_CLIENT_SECRET` — see `docs/backup-restore.md`) |
 | `cloud-backup/` | systemd service + timer for the nightly backup (`make backup-install`) |
 | `docs/backup-restore.md` | backup & restore runbook |
 | `scripts/pg_extract.sh` | slice one DB out of a `pg_dumpall` dump |

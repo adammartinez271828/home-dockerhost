@@ -183,7 +183,8 @@ and run `make restore-test F=<file>`.
 
 - **Google Drive** over Dropbox/iCloud: all three would need rclone; Drive
   and Dropbox both have mature, headless-friendly rclone backends, but
-  Drive's `drive.file` scope gives least-privilege with no extra setup, you
+  Drive's `drive.file` scope gives least-privilege (an OAuth client of your
+  own is needed either way), you
   already had an rclone Drive remote on the desktop, and iCloud's rclone
   backend needs an interactive 2FA session that doesn't suit a cron job.
 - **No encryption:** recipes aren't sensitive; skipping it removes a secret

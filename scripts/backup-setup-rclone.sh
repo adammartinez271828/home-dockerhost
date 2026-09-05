@@ -29,7 +29,8 @@ need_client() {
 	exit 1
 }
 
-if rclone listremotes | grep -qx "$DRIVE_REMOTE:"; then
+remotes=$(rclone listremotes)
+if printf '%s\n' "$remotes" | grep -qx "$DRIVE_REMOTE:"; then
 	if [ -z "$(rclone config show "$DRIVE_REMOTE" | sed -n 's/^client_id = //p')" ]; then
 		need_client
 		echo "$DRIVE_REMOTE uses rclone's shared client_id; switching to yours — a browser window will open for sign-in..."

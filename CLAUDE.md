@@ -79,8 +79,9 @@ by `make backup-install`. `scripts/db-restore.sh` restores into a throwaway
 `con_db_restoretest` container by default and only touches the live DB with
 `--live` (typed confirmation, safety dump first). Never point a restore at the
 live DB for testing — use `make restore-test`. The rclone remote is created
-on a machine with a browser by `scripts/backup-setup-rclone.sh` and copied to
-the Pi.
+on a machine with a browser by `scripts/backup-setup-rclone.sh` (which needs
+your own Google OAuth client in `GDRIVE_CLIENT_ID`/`GDRIVE_CLIENT_SECRET`;
+rclone's shared client is retired) and copied to the Pi.
 
 ## Claude Code skills
 
