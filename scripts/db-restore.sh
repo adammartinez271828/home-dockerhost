@@ -108,10 +108,15 @@ db_image() {
 	sed -n '/^  db_recipes:/,/^  [a-z_]*:/p' docker-compose.yml | grep -m1 -E '^\s*image:' | awk '{print $2}'
 }
 container_running() { docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null | grep -qx true; }
-wait_ready() { # wait_ready CONTAINER
+wait_ready() { # wait_ready CONTAINER (freshly created from the official postgres image)
+	# The image's entrypoint first runs a temporary, socket-only server to create
+	# $PGDB, then restarts for real. pg_isready answers from that temporary server
+	# too (before the database exists), so also require the entrypoint's
+	# "init process complete" line — on a fast host the race is otherwise lost.
 	local _i
 	for _i in $(seq 1 60); do
-		if docker exec "$1" pg_isready -q -U "$PGUSER" -d "$PGDB" 2>/dev/null; then return 0; fi
+		if docker logs "$1" 2>&1 | grep -q 'PostgreSQL init process complete' \
+			&& docker exec "$1" pg_isready -q -U "$PGUSER" -d "$PGDB" 2>/dev/null; then return 0; fi
 		sleep 1
 	done
 	die "$1 did not become ready in 60s"
