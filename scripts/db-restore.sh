@@ -61,7 +61,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		--list)
 			need_remote
-			for d in daily monthly; do
+			for d in daily monthly kinboard; do
 				echo "== $(rpath db/$d)"
 				rclone lsl "$(rpath db/$d)" 2>/dev/null || echo "  (empty)"
 			done

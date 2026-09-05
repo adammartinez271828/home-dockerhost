@@ -12,6 +12,12 @@
 #                                   retention, and ping $BACKUP_HEALTHCHECK_URL
 #                                   (what the nightly cloud-backup.timer runs)
 #
+# Kinboard (kinboard/README.md) rides along: if its kinboard-db container is
+# running, the same run also dumps it to backups/kinboard-<ts>.dump, uploads
+# that under db/kinboard (same size check, same BACKUP_KEEP_DAYS retention)
+# and `rclone copy`s its storage dir to storage-kinboard/. A missing Kinboard
+# container only logs a warning; the Tandoor backup is never held hostage.
+#
 # Dumps are pg_dump "custom" format (-Fc): compressed, restorable with
 # pg_restore into any Postgres >= the dump's version, and convertible to plain
 # SQL with `pg_restore -f -`. The dump is a consistent snapshot; nothing needs
@@ -46,6 +52,13 @@ PGUSER=$(env_get env.d/recipes.env POSTGRES_USER djangouser)
 PGDB=$(env_get env.d/recipes.env POSTGRES_DB djangodb)
 LOCAL_KEEP_DAYS=$(env_get "$BACKUP_ENV_FILE" BACKUP_LOCAL_KEEP_DAYS 7)
 HC_URL=$(env_get "$BACKUP_ENV_FILE" BACKUP_HEALTHCHECK_URL '')
+# Kinboard: separate compose project (submodule kinboard/upstream), its own
+# Postgres. supabase_admin is the superuser that can read every schema.
+DO_KINBOARD=$(env_get "$BACKUP_ENV_FILE" BACKUP_KINBOARD 1)
+KB_CONTAINER=${KB_CONTAINER:-kinboard-db}
+KB_ENV_FILE=${KB_ENV_FILE:-kinboard/upstream/webapp/docker/.env}
+KB_STORAGE_DIR=$(env_get "$BACKUP_ENV_FILE" BACKUP_KINBOARD_STORAGE_DIR \
+	"$(env_get "$KB_ENV_FILE" DATA_DIR '')/storage")
 
 # Report the outcome to the (optional) healthcheck URL, whatever happens.
 finish() {
@@ -80,8 +93,30 @@ mv "$part" "$BACKUP_DIR/$name"
 size=$(stat -c %s "$BACKUP_DIR/$name")
 log "wrote $BACKUP_DIR/$name ($size bytes)"
 
+# --- 1b. dump kinboard (optional, never fatal for Tandoor) -------------------
+# The kinboard dump is the whole `postgres` database (no -t): auth/storage
+# schemas included, so a restore has everything the app expects. Restore per
+# kinboard/README.md: stack up first, then pg_restore --data-only.
+kb_name=""
+if [ "$DO_KINBOARD" = 1 ]; then
+	if docker inspect -f '{{.State.Running}}' "$KB_CONTAINER" 2>/dev/null | grep -qx true; then
+		kb_name="kinboard-$ts.dump"
+		kb_part="$BACKUP_DIR/.$kb_name.part"
+		log "dumping postgres from $KB_CONTAINER"
+		docker exec -i "$KB_CONTAINER" pg_dump -U supabase_admin -F c postgres > "$kb_part"
+		[ "$(head -c5 "$kb_part")" = "PGDMP" ] || die "kinboard dump is not a pg_dump custom-format archive"
+		docker exec -i "$KB_CONTAINER" pg_restore --list < "$kb_part" > /dev/null \
+			|| die "pg_restore --list rejected the kinboard dump"
+		mv "$kb_part" "$BACKUP_DIR/$kb_name"
+		kb_size=$(stat -c %s "$BACKUP_DIR/$kb_name")
+		log "wrote $BACKUP_DIR/$kb_name ($kb_size bytes)"
+	else
+		log "WARNING: container $KB_CONTAINER is not running; skipping the kinboard dump"
+	fi
+fi
+
 # --- 2. prune local -----------------------------------------------------------
-find "$BACKUP_DIR" -maxdepth 1 -name 'recipes-*.dump' -type f -mtime +"$LOCAL_KEEP_DAYS" -print -delete \
+find "$BACKUP_DIR" -maxdepth 1 \( -name 'recipes-*.dump' -o -name 'kinboard-*.dump' \) -type f -mtime +"$LOCAL_KEEP_DAYS" -print -delete \
 	| sed 's/^/pruned local: /' || true
 
 [ "$upload" -eq 1 ] || exit 0
@@ -117,6 +152,22 @@ if ! rclone lsf "$(rpath db/monthly)" 2>/dev/null | grep -q "^recipes-$month"; t
 	rclone copyto "$(rpath "db/daily/$name")" "$(rpath "db/monthly/$name")"
 fi
 
+# Kinboard dump: flat db/kinboard/, one per run, same retention as db/daily.
+if [ -n "$kb_name" ]; then
+	log "uploading $kb_name to $(rpath db/kinboard)"
+	rclone copyto "$BACKUP_DIR/$kb_name" "$(rpath "db/kinboard/$kb_name")"
+	kb_rsize=$(rclone lsf --format s "$(rpath "db/kinboard/$kb_name")")
+	[ "$kb_rsize" = "$kb_size" ] || die "remote size ($kb_rsize) != local size ($kb_size) for $kb_name"
+	log "verified remote copy ($kb_rsize bytes)"
+	# Uploaded files (Supabase storage bind mount): `copy`, never `sync`, as for mediafiles.
+	if [ -d "$KB_STORAGE_DIR" ] && [ -n "$(ls -A "$KB_STORAGE_DIR" 2>/dev/null)" ]; then
+		log "copying $KB_STORAGE_DIR/"
+		rclone copy --transfers 4 "$KB_STORAGE_DIR" "$(rpath storage-kinboard)"
+	else
+		log "$KB_STORAGE_DIR missing or empty; skipping"
+	fi
+fi
+
 # mediafiles: `copy`, not `sync`, so a missing/empty bind mount or a bad day
 # can never delete images from the remote. Orphans are cheap; losses aren't.
 if [ "$DO_MEDIA" = 1 ]; then
@@ -138,3 +189,8 @@ log "pruning remote: daily > ${KEEP_DAYS}d, monthly > ${KEEP_MONTHLY_DAYS}d"
 rclone delete --min-age "${KEEP_DAYS}d" "$(rpath db/daily)"
 rclone delete --min-age "${KEEP_MONTHLY_DAYS}d" "$(rpath db/monthly)"
 log "remote now holds $(rclone lsf "$(rpath db/daily)" | wc -l) daily, $(rclone lsf "$(rpath db/monthly)" | wc -l) monthly dumps"
+# Kinboard's folder is only thinned on a run that just verified a new kinboard upload.
+if [ -n "$kb_name" ]; then
+	rclone delete --min-age "${KEEP_DAYS}d" "$(rpath db/kinboard)"
+	log "remote now holds $(rclone lsf "$(rpath db/kinboard)" | wc -l) kinboard dumps"
+fi
