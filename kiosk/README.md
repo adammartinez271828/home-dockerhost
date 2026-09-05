@@ -1,7 +1,7 @@
 # Kitchen kiosk (`kitchen-kiosk`)
 
-The wall-mounted family dashboard: a Raspberry Pi 4 driving a portrait ASUS
-VG27AQ, showing [Kinboard](../kinboard/README.md) full-screen in Chromium
+The wall-mounted family dashboard: a Raspberry Pi 4 driving a portrait BenQ
+EW3290U 32" 4K (3840×2160, driven at 30 Hz), showing [Kinboard](../kinboard/README.md) full-screen in Chromium
 under the Cage compositor. Unlike `dockerhost`, **nothing on this host comes
 from cloning this repo**: it runs no containers and holds no checkout. It is a
 hand-provisioned Raspberry Pi OS Lite install, so this file is the record of
