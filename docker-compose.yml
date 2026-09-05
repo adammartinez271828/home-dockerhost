@@ -50,7 +50,9 @@ services:
   web_recipes:
     container_name: con_web_recipes
     image: vabene1111/recipes:2.6.13
-    # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # current image (1.5.33)
+    # image: vabene1111/recipes@sha256:f6c58afdea7a721d079ebd6ee5483f2c9da77dd1e709e16d60a82c218e80a451  # current image
+    # pre-2.x rollback (needs the matching pre-upgrade DB dump restored, see docs/backup-restore.md):
+    # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # 1.5.33
     restart: unless-stopped
     mem_limit: 512m
     mem_reservation: 256m
@@ -73,7 +75,7 @@ services:
   smokeping:
     container_name: con_smokeping
     image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls182
-    # image: lscr.io/linuxserver/smokeping@sha256:320bbb64e914c5abab1284f80a45f3dd7057733e3e17fbb3adc33d8ea21813a5  # current image (2.9.0-r0-ls172)
+    # image: lscr.io/linuxserver/smokeping@sha256:2f4488c9afcddb36ec5c1b091e71269c06b4b05bd6775f1d015701a830cb8e86  # current image
     restart: unless-stopped
     mem_limit: 128m
     mem_reservation: 32m
@@ -91,7 +93,7 @@ services:
   speedtest:
     container_name: con_speedtest
     image: lscr.io/linuxserver/speedtest-tracker:v1.15.0-ls170
-    # image: lscr.io/linuxserver/speedtest-tracker@sha256:79c00631575dec6d91c10ed904c211224f00813013a305c2284324e195a538bb  # current image (v1.14.3-ls155)
+    # image: lscr.io/linuxserver/speedtest-tracker@sha256:1193562c4ab4fe29cffd5e6ad4c042a2ed02e218999bedc7c801c96e032d9f9b  # current image
     restart: unless-stopped
     mem_limit: 256m
     mem_reservation: 64m
