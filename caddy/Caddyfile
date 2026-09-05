@@ -19,3 +19,13 @@ http://smokeping.local {
 http://speedtest.local {
 	reverse_proxy speedtest:80
 }
+
+# Kinboard: one origin, split by path. The browser bundle talks to the Supabase
+# gateway (Kong) directly, so /rest /auth /storage /realtime go to Kong and
+# everything else to the Next.js webapp. Both run in a separate compose project
+# (~/kinboard) joined to network_landockernet by kinboard/docker-compose.override.yml.
+http://kinboard.local {
+	@api path /rest/* /auth/* /storage/* /realtime/*
+	reverse_proxy @api kinboard-kong:8000
+	reverse_proxy kinboard-webapp:3000
+}
