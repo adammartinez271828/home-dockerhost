@@ -49,7 +49,8 @@ smokeping-targets: ## Apply tracked smokeping/Targets to the prober and restart 
 	@echo "Applied smokeping/Targets and restarted SmokePing"
 
 beszel-key: ## Print the Beszel hub's public key (paste into env.d/beszel.env as KEY=)
-	@$(COMPOSE) exec beszel cat /beszel_data/id_ed25519.pub
+	@test -f beszel/data/id_ed25519 || { echo "beszel/data/id_ed25519 not found - run 'make up' first so the hub generates its key"; exit 1; }
+	@sudo ssh-keygen -y -f beszel/data/id_ed25519
 
 mdns-install: ## Install + enable the mDNS alias service (one-time, sudo)
 	sed 's|^ExecStart=.*|ExecStart=$(CURDIR)/mdns-aliases/mdns-aliases.sh|' \

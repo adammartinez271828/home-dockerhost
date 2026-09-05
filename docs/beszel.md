@@ -21,15 +21,18 @@ socket (read-only) for systemd units matching `SERVICE_PATTERNS` in
 
 The agent only accepts a hub that signs with the key in its `KEY` env var.
 That is the hub's own ed25519 public key, generated on the hub's first start,
-so bringing Beszel up is a two-step bootstrap.
+so bringing Beszel up is a two-step bootstrap. The hub image is a bare Go
+binary (no shell) and writes only the root-owned private key
+`beszel/data/id_ed25519`; `make beszel-key` derives the public half on the
+host with `sudo ssh-keygen -y`.
 
 ## First deploy
 
 ```sh
 cp env.d/beszel.env.example env.d/beszel.env   # KEY empty for now
 make up                                        # hub starts and generates its key;
-                                               # the agent starts but idles until KEY is set
-make beszel-key                                # prints "ssh-ed25519 AAAA..."
+                                               # the agent restart-loops until KEY is set
+make beszel-key                                # prints "ssh-ed25519 AAAA..." (sudo)
 $EDITOR env.d/beszel.env                       # KEY=ssh-ed25519 AAAA...
 make up                                        # recreates only the agent
 make caddy-reload && make mdns-restart         # beszel.local
