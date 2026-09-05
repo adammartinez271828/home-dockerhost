@@ -1,0 +1,20 @@
+# Kinboard compose override for this host. Copied (not symlinked) into the
+# submodule at kinboard/upstream/webapp/docker/, where start.sh loads it via
+# COMPOSE_FILES in .env alongside docker-compose.yml + docker-compose.image.yml.
+#
+# - Puts Kong (the Supabase gateway) and the webapp on the homelab's shared
+#   network so Caddy can reach them by container name (kinboard-kong:8000,
+#   kinboard-webapp:3000) without any host-port binding.
+# - Parks go2rtc behind a profile: no cameras here, saves RAM.
+# See kinboard/README.md.
+services:
+  kong:
+    networks: [kinboard, landockernet]
+  webapp:
+    networks: [kinboard, landockernet]
+  go2rtc:
+    profiles: ["cameras"]
+networks:
+  landockernet:
+    name: network_landockernet
+    external: true

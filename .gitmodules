@@ -1,0 +1,5 @@
+[submodule "kinboard/upstream"]
+	path = kinboard/upstream
+	url = https://github.com/svenger87/kinboard.git
+	ignore = dirty
+	shallow = true
