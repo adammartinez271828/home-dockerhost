@@ -115,11 +115,70 @@ services:
     volumes:
       - ./speedtest/config:/config
 
+  # Beszel — host + Docker + systemd monitoring (docs/beszel.md). The hub (web
+  # UI, SQLite) sits on the compose network behind Caddy as beszel.local. The
+  # agent must run in the host network namespace to report real host NICs and
+  # load, so it is NOT on network_landockernet; hub and agent talk over the
+  # shared beszel_socket volume instead (no TCP listener, no host port). The
+  # agent's KEY (the hub's public key) is a credential → env.d/beszel.env.
+  beszel:
+    container_name: con_beszel
+    image: henrygd/beszel:0.19.0
+    # on first deploy, record the pulled digest here for rollback:
+    # image: henrygd/beszel@sha256:...  # current image
+    restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 64m
+    environment:
+      - APP_URL=http://beszel.local
+      - TZ=America/New_York
+    volumes:
+      - ./beszel/data:/beszel_data
+      - beszel_socket:/beszel_socket
+    healthcheck:
+      test: ["CMD", "/beszel", "health", "--url", "http://localhost:8090"]
+      interval: 120s
+      timeout: 5s
+      start_period: 10s
+
+  beszel_agent:
+    container_name: con_beszel_agent
+    image: henrygd/beszel-agent:0.19.0
+    # image: henrygd/beszel-agent@sha256:...  # current image
+    restart: unless-stopped
+    network_mode: host
+    mem_limit: 128m
+    mem_reservation: 32m
+    env_file:
+      - ./env.d/beszel.env
+    environment:
+      - LISTEN=/beszel_socket/beszel.sock
+      # SoC temperature in the systems table (hwmon name on the Pi 5)
+      - PRIMARY_SENSOR=cpu_thermal
+      # systemd units to watch, via the D-Bus socket mounted below
+      - SERVICE_PATTERNS=docker.service,avahi-daemon.service,mdns-aliases.service,cloud-backup.*
+      - TZ=America/New_York
+    volumes:
+      - ./beszel/agent-data:/var/lib/beszel-agent
+      - beszel_socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+    # Uncomment only if the agent logs D-Bus permission errors and the
+    # systemd panel stays empty (Docker's default AppArmor profile can block
+    # D-Bus). See docs/beszel.md.
+    # security_opt: ["apparmor:unconfined"]
+    healthcheck:
+      test: ["CMD", "/agent", "health"]
+      interval: 120s
+      timeout: 10s
+      start_period: 10s
+
 volumes:
   nginx_config:
   staticfiles:
   caddy_data:
   caddy_config:
+  beszel_socket:
 
 networks:
   default:

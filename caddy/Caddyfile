@@ -20,6 +20,17 @@ http://speedtest.local {
 	reverse_proxy speedtest:80
 }
 
+http://beszel.local {
+	# Beszel hub. The UI holds long-lived websocket/SSE streams; upstream's
+	# reverse-proxy guidance is a generous read timeout. Caddy proxies
+	# websockets without further config.
+	reverse_proxy beszel:8090 {
+		transport http {
+			read_timeout 360s
+		}
+	}
+}
+
 # Kinboard: one origin, split by path. The browser bundle talks to the Supabase
 # gateway (Kong) directly, so /rest /auth /storage /realtime go to Kong and
 # everything else to the Next.js webapp. Both run in a separate compose project

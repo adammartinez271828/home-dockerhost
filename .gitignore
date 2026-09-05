@@ -17,5 +17,8 @@ dashy_conf.yml
 smokeping/config
 smokeping/data
 speedtest/config
+# Beszel runtime state (hub SQLite + keys, agent fingerprints)
+beszel/data
+beszel/agent-data
 # python bytecode (from the add-recipe skill)
 __pycache__/

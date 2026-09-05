@@ -9,7 +9,7 @@ KINBOARD_DIR := kinboard/upstream/webapp/docker
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart pull update ps logs caddy-reload \
-        smokeping-targets \
+        smokeping-targets beszel-key \
         mdns-install mdns-restart mdns-status \
         backup-db backup-cloud backup-list backup-prune backup-install backup-status \
         restore-test restore-test-clean dev-setup \
@@ -47,6 +47,9 @@ smokeping-targets: ## Apply tracked smokeping/Targets to the prober and restart 
 	cp smokeping/Targets smokeping/config/Targets
 	$(COMPOSE) restart smokeping
 	@echo "Applied smokeping/Targets and restarted SmokePing"
+
+beszel-key: ## Print the Beszel hub's public key (paste into env.d/beszel.env as KEY=)
+	@$(COMPOSE) exec beszel cat /beszel_data/id_ed25519.pub
 
 mdns-install: ## Install + enable the mDNS alias service (one-time, sudo)
 	sed 's|^ExecStart=.*|ExecStart=$(CURDIR)/mdns-aliases/mdns-aliases.sh|' \
