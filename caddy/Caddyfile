@@ -7,7 +7,7 @@
 # matching name to mdns-aliases/aliases so it resolves on the LAN.
 
 http://recipes.local {
-	reverse_proxy nginx_recipes:80
+	reverse_proxy web_recipes:80
 }
 
 http://smokeping.local {

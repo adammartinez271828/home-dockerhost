@@ -41,10 +41,16 @@ services:
       retries: 5
       start_period: 30s
 
+  # Tandoor Recipes 2.x. Since 2.0 the image bundles its own nginx (static +
+  # media + proxy to gunicorn over a unix socket) on port 80, so there is no
+  # separate nginx sidecar any more; Caddy fronts it as web_recipes:80.
+  # Tandoor 2 DB migrations are one-way: `make backup-db` before any bump, and
+  # roll back by restoring that dump (scripts/db-restore.sh --live) on the
+  # previous image.
   web_recipes:
     container_name: con_web_recipes
-    image: vabene1111/recipes:1.5.33
-    # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # current image
+    image: vabene1111/recipes:2.6.13
+    # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # current image (1.5.33)
     restart: unless-stopped
     mem_limit: 512m
     mem_reservation: 256m
@@ -55,26 +61,7 @@ services:
       - ./env.d/recipes.env
     volumes:
       - staticfiles:/opt/recipes/staticfiles
-      - nginx_config:/opt/recipes/nginx/conf.d
       - ./mediafiles:/opt/recipes/mediafiles
-
-  # Tandoor's own nginx (static + media). No host port — Caddy fronts it
-  # internally as nginx_recipes:80.
-  nginx_recipes:
-    container_name: con_nginx_recipes
-    image: nginx:1.27.4-alpine
-    # image: nginx@sha256:4ff102c5d78d254a6f0da062b3cf39eaf07f01eec0927fd21e219d0af8bc0591  # current image
-    restart: unless-stopped
-    mem_limit: 64m
-    mem_reservation: 16m
-    depends_on:
-      - web_recipes
-    env_file:
-      - ./env.d/recipes.env
-    volumes:
-      - nginx_config:/etc/nginx/conf.d:ro
-      - staticfiles:/static:ro
-      - ./mediafiles:/media:ro
 
   # SmokePing — continuous latency + packet-loss grapher; the dockerized
   # successor to the host-side ~/netmon kit. Pings WAN / AT&T gateway / Nest /
@@ -85,9 +72,8 @@ services:
   # file; apply changes with `make smokeping-targets`.
   smokeping:
     container_name: con_smokeping
-    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls172
-    # on first deploy, record the pulled digest here for rollback:
-    # image: lscr.io/linuxserver/smokeping@sha256:...  # current image
+    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls182
+    # image: lscr.io/linuxserver/smokeping@sha256:320bbb64e914c5abab1284f80a45f3dd7057733e3e17fbb3adc33d8ea21813a5  # current image (2.9.0-r0-ls172)
     restart: unless-stopped
     mem_limit: 128m
     mem_reservation: 32m
@@ -104,9 +90,8 @@ services:
   # env.d/speedtest.env (gitignored; copy from speedtest.env.example).
   speedtest:
     container_name: con_speedtest
-    image: lscr.io/linuxserver/speedtest-tracker:v1.14.3-ls155
-    # on first deploy, record the pulled digest here for rollback:
-    # image: lscr.io/linuxserver/speedtest-tracker@sha256:...  # current image
+    image: lscr.io/linuxserver/speedtest-tracker:v1.15.0-ls170
+    # image: lscr.io/linuxserver/speedtest-tracker@sha256:79c00631575dec6d91c10ed904c211224f00813013a305c2284324e195a538bb  # current image (v1.14.3-ls155)
     restart: unless-stopped
     mem_limit: 256m
     mem_reservation: 64m
@@ -173,7 +158,6 @@ services:
       start_period: 10s
 
 volumes:
-  nginx_config:
   staticfiles:
   caddy_data:
   caddy_config:

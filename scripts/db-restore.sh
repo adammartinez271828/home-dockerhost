@@ -187,7 +187,7 @@ fi
 container_running "$DB_CONTAINER" || die "$DB_CONTAINER is not running"
 echo
 echo "!!! LIVE RESTORE into $DB_CONTAINER ($PGDB) from $src"
-echo "    web_recipes/nginx_recipes will be stopped, the current DB dumped to"
+echo "    web_recipes will be stopped, the current DB dumped to"
 echo "    $BACKUP_DIR/pre-restore-*.dump, then DROPPED and recreated from the file."
 echo
 if [ "$confirmed" -ne 1 ]; then
@@ -196,8 +196,8 @@ if [ "$confirmed" -ne 1 ]; then
 	[ "$answer" = restore ] || die "aborted"
 fi
 
-log "stopping web_recipes nginx_recipes"
-docker compose stop web_recipes nginx_recipes
+log "stopping web_recipes"
+docker compose stop web_recipes
 safety="$BACKUP_DIR/pre-restore-$(date +%Y%m%d-%H%M%S).dump"
 log "safety dump of current DB -> $safety"
 docker exec -i "$DB_CONTAINER" pg_dump -U "$PGUSER" -d "$PGDB" -Fc > "$safety"
@@ -205,8 +205,8 @@ log "dropping and recreating $PGDB"
 docker exec "$DB_CONTAINER" dropdb -U "$PGUSER" --force --if-exists "$PGDB"
 docker exec "$DB_CONTAINER" createdb -U "$PGUSER" -O "$PGUSER" "$PGDB"
 restore_rc=0; do_restore "$DB_CONTAINER" || restore_rc=$?
-log "starting web_recipes nginx_recipes"
-docker compose up -d web_recipes nginx_recipes
+log "starting web_recipes"
+docker compose up -d web_recipes
 echo
 print_stats "live($DB_CONTAINER)" "$DB_CONTAINER"
 echo

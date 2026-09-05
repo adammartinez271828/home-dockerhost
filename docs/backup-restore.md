@@ -115,7 +115,7 @@ make backup-list                                          # pick a dump
 # or a local one:  ./scripts/db-restore.sh backups/recipes-<ts>.dump --live
 ```
 
-`--live` asks you to type `restore`, then: stops `web_recipes`/`nginx_recipes`
+`--live` asks you to type `restore`, then: stops `web_recipes`
 → dumps the *current* DB to `backups/pre-restore-<ts>.dump` (your undo) →
 `dropdb` + `createdb` → `pg_restore` → starts the web containers → prints
 the counts. To undo: `./scripts/db-restore.sh backups/pre-restore-<ts>.dump --live`.

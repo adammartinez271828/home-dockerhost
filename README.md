@@ -22,7 +22,7 @@ Two layers give you `http://recipes.local` instead of a bare IP:
 
 ```
 client ──(mDNS: recipes.local → 192.168.86.197)──▶ Pi :80 ──▶ Caddy
-                                                              └─(Host: recipes.local)─▶ nginx_recipes:80
+                                                              └─(Host: recipes.local)─▶ web_recipes:80  
 ```
 
 > Plain HTTP only. `.local` names can't get a real CA cert, and self-signed
@@ -33,9 +33,9 @@ client ──(mDNS: recipes.local → 192.168.86.197)──▶ Pi :80 ──▶ 
 All share the external bridge network `network_landockernet` and are prefixed `con_`.
 
 - **caddy** — reverse proxy / network entrypoint (host port `:80`).
-- **recipes** — a 3-container [Tandoor Recipes](https://github.com/vabene1111/recipes)
-  deployment: `db_recipes` (Postgres 16) + `web_recipes` (Django/gunicorn) +
-  `nginx_recipes` (static/media server). Fronted by Caddy as `recipes.local`.
+- **recipes** — a 2-container [Tandoor Recipes](https://github.com/vabene1111/recipes) 2.x
+  deployment: `db_recipes` (Postgres 16) + `web_recipes` (the Tandoor image, whose
+  built-in nginx serves the app, static and media on :80). Fronted by Caddy as `recipes.local`.
 - **smokeping** — continuous latency + packet-loss grapher
   ([SmokePing](https://oss.oetiker.ch/smokeping/)). Pings WAN / gateway / DNS
   targets and renders RRD jitter graphs. Fronted by Caddy as `smokeping.local`
