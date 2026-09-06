@@ -1,0 +1,6 @@
+# /etc/pam.d/cage -- verbatim from the Cage wiki. pam_systemd registers a
+# logind session so wlroots gets the seat (DRM + input) without root.
+auth           required        pam_unix.so nullok
+account        required        pam_unix.so
+session        required        pam_unix.so
+session        required        pam_systemd.so

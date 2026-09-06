@@ -1,0 +1,22 @@
+# /etc/default/kinboard-kiosk -- environment for cage@tty1.service
+# (EnvironmentFile=, read by kiosk/kinboard-kiosk). Plain KEY=value lines, no
+# quoting needed. kiosk/install.sh copies this file into place only if it is
+# absent; edit the live copy on the kiosk and `make kiosk-restart` to apply.
+
+# wlroots output name as printed by wlr-randr (Pi 4 HDMI0 = HDMI-A-1).
+KIOSK_OUTPUT=HDMI-A-1
+
+# Portrait rotation: 270 or 90 depending on which way the monitor hangs.
+KIOSK_TRANSFORM=270
+
+# Chromium --force-device-scale-factor. 2.25 for native 4K (3840x2160);
+# about 1.1 if KIOSK_MODE=1920x1080 is set and the monitor upscales.
+KIOSK_SCALE=2.25
+
+# Optional fixed mode (WIDTHxHEIGHT, or WIDTHxHEIGHT@HZ) passed to wlr-randr.
+# Unset = the output's native/preferred mode. Set 1920x1080 if the Pi 4
+# struggles compositing Chromium at 4K.
+#KIOSK_MODE=1920x1080
+
+# Page to show.
+KIOSK_URL=http://kinboard.local/

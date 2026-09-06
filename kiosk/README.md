@@ -22,8 +22,9 @@ Host facts:
 | Access | key-only SSH from the desktop, passwordless sudo (`/etc/sudoers.d/010_kiosk-nopasswd`) |
 | Old SSD | the Pi 4's previous `dockerhost` SSD is unplugged and labelled "dockerhost rollback 2026-09-05". **Never reattach it to this Pi**; with no USB boot device the Pi 4 boots the card |
 
-What this directory holds: this README now; the Phase 6 kiosk wrapper script
-and its systemd unit once they exist (see *Not done yet*).
+What this directory holds: this README, and the kiosk wrapper script, systemd
+unit, PAM file, defaults example and `install.sh` that deploy it (see
+*Compositor and kiosk unit*).
 
 ## Day-to-day
 
@@ -126,19 +127,61 @@ Check: `cage -v`, `chromium --version`; from the kiosk
 `curl -s -o /dev/null -w '%{http_code}\n' http://kinboard.local/` → `200`,
 `…/rest/v1/` → `401` (Kong), `…/api/health` contains `"db":true`.
 
-## Not done yet (Phase 6 of the plan)
+## Compositor and kiosk unit (Phase 6)
 
-- `/usr/local/bin/kinboard-kiosk` wrapper (rotate with `wlr-randr`, `exec
-  chromium --kiosk … --ozone-platform=wayland`), to be tracked here.
-- `cage@tty1.service` as user `kiosk` with the Cage wiki's PAM stack,
-  `Restart=always`; `/etc/default/kinboard-kiosk` for `KIOSK_OUTPUT`,
-  `KIOSK_TRANSFORM` (90 vs 270 decided on the wall), `KIOSK_SCALE`.
-- The HDMI output name has not been observed yet (bench boot was headless);
-  both `card1-HDMI-A-{1,2}` reported `disconnected`. Expect `HDMI-A-1`.
-- Join the kiosk to the Kinboard family from its browser, turn on kiosk mode
-  for that device, and **set Kinboard's screensaver inactivity timeout to
-  off first** or the wall goes dark.
-- Add the kiosk to `smokeping/Targets` and reserve `.206` in Google Home.
+The tracked files in this directory are deployed to the kiosk over ssh by
+`kiosk/install.sh` (`make kiosk-install`; `KIOSK_HOST` defaults to
+`kiosk@kitchen-kiosk.local`). The kiosk keeps no clone, so **edit here, then
+re-run the install** — never edit the installed copies by hand.
+
+| Tracked file | Installed as | What it is |
+|---|---|---|
+| `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
+| `cage@.service` | `/etc/systemd/system/cage@.service` (644) | the Cage wiki's unit: `User=kiosk`, `PAMName=cage`, `Conflicts=getty@%i`, `Restart=always`/`RestartSec=3`, `EnvironmentFile=-/etc/default/kinboard-kiosk`; instance `cage@tty1` |
+| `pam.d-cage` | `/etc/pam.d/cage` (644) | `pam_unix` + `pam_systemd`: registers a logind session so wlroots gets the seat without root |
+| `kinboard-kiosk.defaults.example` | `/etc/default/kinboard-kiosk` **only if absent** | the knobs below; the live copy is the kiosk's own state, so local tuning survives reinstalls |
+| `install.sh` | — | `scp` to a temp dir, `sudo install` each file, `daemon-reload`, `set-default graphical.target`, `enable cage@tty1`; `--restart` (`make kiosk-install R=1`) also restarts the unit. Idempotent |
+
+Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`):
+
+- `KIOSK_OUTPUT` — wlroots output name; Pi 4 HDMI0 (next to USB-C) is `HDMI-A-1`.
+- `KIOSK_TRANSFORM` — `270` (default) or `90`: purely which way the monitor
+  hangs on the arm; flip it if the page is upside-down.
+- `KIOSK_SCALE` — Chromium device scale. `2.25` at native 4K; ~`1.1` with the
+  1080p fallback.
+- `KIOSK_MODE` — unset = native 3840x2160 (the Pi 4 does 4K at 30 Hz on
+  HDMI0). `1920x1080` is the escape hatch if a 2 GB Pi 4 struggles to
+  composite Chromium at 4K; the monitor upscales.
+- `KIOSK_URL` — `http://kinboard.local/`.
+
+Day-to-day:
+
+```sh
+desk$ make kiosk-status     # systemctl status cage@tty1 + loginctl (expect a kiosk session on seat0/tty1)
+desk$ make kiosk-logs       # journalctl -u cage@tty1 -f (Cage + Chromium stderr)
+desk$ make kiosk-restart    # after editing /etc/default/kinboard-kiosk on the kiosk
+desk$ make kiosk-install R=1  # after editing kiosk/kinboard-kiosk or cage@.service here
+kiosk$ sudo -u kiosk env WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 wlr-randr   # output name, modes, Transform
+```
+
+Seat access: `seatd` is installed and its socket is group `video`, which
+`kiosk` is in, so libseat uses the seatd backend; the PAM/logind session is
+still what gives the unit a VT. Nothing extra was needed.
+
+Crash / reboot drill (the acceptance test; re-run after any change here):
+`sudo pkill -9 chromium` — Cage exits with its child and systemd restarts
+the unit within ~10 s (`systemctl is-active cage@tty1` → `active`). `sudo
+reboot` — the dashboard is back with no login prompt and no cursor; compare
+`systemctl show -p ActiveEnterTimestamp cage@tty1` with `uptime -s`.
+
+Kinboard side (done once, in the web UI): Settings → Screensaver →
+inactivity timeout **off** (or the wall goes dark); the kiosk joined the
+family from `/join` with a USB keyboard as device **`kitchen-kiosk`**, then
+Settings → Devices → `kitchen-kiosk` → **Kiosk mode** on hides the nav
+drawer. Rollback: remove the device; it can rejoin with the code.
+
+Rollback of the whole unit: `sudo systemctl disable --now cage@tty1 &&
+sudo systemctl set-default multi-user.target`.
 
 ## Gotchas hit on 2026-09-05
 

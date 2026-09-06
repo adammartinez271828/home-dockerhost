@@ -1,0 +1,35 @@
+# Cage compositor running the Kinboard kiosk on a VT, as the unprivileged
+# `kiosk` user. From the Cage wiki "Starting Cage on boot with systemd" with
+# ExecStart / User / EnvironmentFile / RestartSec changed. Installed to
+# /etc/systemd/system/cage@.service by kiosk/install.sh; instance: cage@tty1.
+[Unit]
+Description=Cage Wayland compositor on %I
+After=systemd-user-sessions.service plymouth-quit-wait.service
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+Wants=dbus.socket systemd-logind.service
+After=dbus.socket systemd-logind.service
+Conflicts=getty@%i.service
+After=getty@%i.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/kinboard-kiosk
+ExecStart=/usr/bin/cage -- /usr/local/bin/kinboard-kiosk
+ExecStartPost=+sh -c "tty_name='%i'; exec chvt $${tty_name#tty}"
+Restart=always
+RestartSec=3
+User=kiosk
+UtmpIdentifier=%I
+UtmpMode=user
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+PAMName=cage
+
+[Install]
+WantedBy=graphical.target
+Alias=display-manager.service
+DefaultInstance=tty1

@@ -6,6 +6,8 @@ COMPOSE := docker compose
 BACKUP_KEEP_DAYS ?= 30
 # Kinboard is a separate compose project driven by upstream's start.sh (kinboard/README.md).
 KINBOARD_DIR := kinboard/upstream/webapp/docker
+# The wall dashboard Pi (kiosk/README.md); reached over ssh, holds no clone of this repo.
+KIOSK_HOST ?= kiosk@kitchen-kiosk.local
 
 .DEFAULT_GOAL := help
 .PHONY: help up down restart pull update ps logs caddy-reload \
@@ -13,7 +15,8 @@ KINBOARD_DIR := kinboard/upstream/webapp/docker
         mdns-install mdns-restart mdns-status \
         backup-db backup-cloud backup-list backup-prune backup-install backup-status \
         restore-test restore-test-clean dev-setup \
-        kinboard-up kinboard-status kinboard-logs
+        kinboard-up kinboard-status kinboard-logs \
+        kiosk-install kiosk-restart kiosk-status kiosk-logs
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -108,6 +111,18 @@ kinboard-status: ## Show Kinboard container state
 
 kinboard-logs: ## Follow Kinboard logs (all, or one service: make kinboard-logs S=webapp)
 	cd $(KINBOARD_DIR) && ./start.sh logs $(S)
+
+kiosk-install: ## Deploy kiosk/ (wrapper, cage@.service, PAM) to $(KIOSK_HOST) and enable cage@tty1 (R=1 to restart it too)
+	@KIOSK_HOST=$(KIOSK_HOST) ./kiosk/install.sh $(if $(R),--restart,)
+
+kiosk-restart: ## Restart the kiosk compositor (after editing /etc/default/kinboard-kiosk on the kiosk)
+	ssh -o BatchMode=yes $(KIOSK_HOST) sudo systemctl restart cage@tty1.service
+
+kiosk-status: ## Show the kiosk unit state and logind sessions
+	@ssh -o BatchMode=yes $(KIOSK_HOST) 'systemctl status cage@tty1.service --no-pager; echo; loginctl'
+
+kiosk-logs: ## Follow the kiosk compositor + Chromium journal
+	ssh -o BatchMode=yes $(KIOSK_HOST) journalctl -u cage@tty1.service -f
 
 dev-setup: ## Set up a dev clone: enable pre-commit hooks + check tooling (one-time)
 	@./scripts/dev-setup.sh

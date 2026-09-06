@@ -1,0 +1,24 @@
+#!/bin/sh
+# Kiosk wrapper run by cage@tty1.service (kiosk/cage@.service) as user kiosk.
+# Rotates the output with wlr-randr, then execs Chromium full-screen on
+# Kinboard. POSIX sh: it runs inside the compositor session. Knobs come from
+# /etc/default/kinboard-kiosk (see kinboard-kiosk.defaults.example).
+set -eu
+OUTPUT="${KIOSK_OUTPUT:-HDMI-A-1}"
+TRANSFORM="${KIOSK_TRANSFORM:-270}"
+URL="${KIOSK_URL:-http://kinboard.local/}"
+if [ -n "${KIOSK_MODE:-}" ]; then
+  wlr-randr --output "$OUTPUT" --mode "$KIOSK_MODE" --transform "$TRANSFORM" || true
+else
+  wlr-randr --output "$OUTPUT" --transform "$TRANSFORM" || true
+fi
+exec chromium \
+  --kiosk --noerrdialogs --disable-infobars --no-first-run \
+  --ozone-platform=wayland \
+  --disable-session-crashed-bubble --disable-features=TranslateUI \
+  --check-for-update-interval=31536000 \
+  --autoplay-policy=no-user-gesture-required \
+  --disable-audio-output \
+  --disk-cache-dir="${XDG_RUNTIME_DIR:-/tmp}/chromium-cache" \
+  --force-device-scale-factor="${KIOSK_SCALE:-2.25}" \
+  "$URL"

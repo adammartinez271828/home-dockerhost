@@ -19,7 +19,7 @@ All services share the external-named bridge network `network_landockernet` and 
 
 - **kinboard** — [Kinboard](https://github.com/svenger87/kinboard) family dashboard, the one service **not** in this compose file. It is its own compose project (Supabase-style stack: `kinboard-db` Postgres 15, `kinboard-kong` gateway, `kinboard-webapp` Next.js, plus auth/rest/storage/realtime/imgproxy/cron) driven by upstream's `start.sh` from the git submodule `kinboard/upstream`, pinned to the tag matching `KINBOARD_TAG` (1.7.0). `kinboard/docker-compose.override.yml` (copied into the submodule) joins `kong` and `webapp` to `network_landockernet`; its host ports (5432, 8100, 8543, 3001) are bound to **127.0.0.1 only**, the accepted exception to "only Caddy publishes a port". Caddy routes `kinboard.local` as one origin split by path: `/rest /auth /storage /realtime` → `kinboard-kong:8000`, everything else → `kinboard-webapp:3000`. Data in `~/kinboard-data/` (outside the repo); host `.env` lives inside the submodule (gitignored there; documented by `env.d/kinboard.env.example`). The nightly backup also dumps it (`db/kinboard/`, plus `storage-kinboard/`). `make kinboard-up/-status/-logs`; details and restore in `kinboard/README.md`. After a `git pull` that moves the submodule: `git submodule update --init`.
 
-- **kitchen-kiosk** — the wall dashboard host, a second Pi (Pi 4, Wi-Fi, SD card) that shows `kinboard.local` in a Chromium kiosk. It runs no containers and has **no clone of this repo**; it is hand-provisioned, and `kiosk/README.md` is the build record (Imager settings, base config, packages, gotchas). Reach it with `ssh kiosk@kitchen-kiosk.local` (key, passwordless sudo). Its old `dockerhost` SSD is the shelved cold rollback: never reattach it.
+- **kitchen-kiosk** — the wall dashboard host, a second Pi (Pi 4, Wi-Fi, SD card) that shows `kinboard.local` in a Chromium kiosk. It runs no containers and has **no clone of this repo**; it is hand-provisioned, and `kiosk/README.md` is the build record (Imager settings, base config, packages, gotchas). Reach it with `ssh kiosk@kitchen-kiosk.local` (key, passwordless sudo). The compositor is `cage@tty1` running the tracked `kiosk/kinboard-kiosk` wrapper; `kiosk/install.sh` (`make kiosk-install`) deploys the wrapper, unit and PAM file over ssh, and `/etc/default/kinboard-kiosk` on the kiosk holds the rotation/scale/output knobs. Its old `dockerhost` SSD is the shelved cold rollback: never reattach it.
 
 Pi-hole, nginx-proxy-manager, and dashy were previously here and have been removed (Pi-hole/NPM superseded by NextDNS + Caddy); recover from git history if needed.
 
@@ -58,6 +58,7 @@ make backup-install # install + enable the nightly cloud-backup systemd timer (s
 make update        # pull newer images and re-up
 make kinboard-up   # start/refresh the Kinboard stack (separate compose project, see kinboard/README.md)
 make kinboard-status # Kinboard container state; make kinboard-logs S=webapp to follow one
+make kiosk-install # deploy kiosk/ to the kitchen-kiosk Pi over ssh (R=1 restarts); kiosk-status/-logs/-restart too
 make dev-setup     # enable the pre-commit hook + check dev tooling (per clone)
 ```
 
