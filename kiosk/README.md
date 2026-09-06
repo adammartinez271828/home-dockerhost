@@ -145,10 +145,16 @@ re-run the install** — never edit the installed copies by hand.
 Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`):
 
 - `KIOSK_OUTPUT` — wlroots output name; Pi 4 HDMI0 (next to USB-C) is `HDMI-A-1`.
-- `KIOSK_TRANSFORM` — `270` (default) or `90`: purely which way the monitor
-  hangs on the arm; flip it if the page is upside-down.
-- `KIOSK_SCALE` — Chromium device scale. `2.25` at native 4K; ~`1.1` with the
-  1080p fallback.
+- `KIOSK_TRANSFORM` — `90` (default; what the kitchen wall needed) or `270`:
+  purely which way the monitor hangs on the arm; flip it if the page is
+  upside-down.
+- `KIOSK_SCALE` — the compositor output scale (`wlr-randr --scale`), an
+  **integer**: `2` at native 4K (a 1080×1920 CSS-px layout); `1` with the
+  1080p fallback. Chromium's `--force-device-scale-factor` is deliberately
+  not used: under Ozone/Wayland it tags a logical-size buffer with that
+  scale, so Cage draws the window at 1/N size in a corner (2.25 → a third,
+  2 → a half; seen 2026-09-06). Fractional values would need
+  `fractional-scale-v1`, which Cage 0.2 lacks.
 - `KIOSK_MODE` — unset = native 3840x2160 (the Pi 4 does 4K at 30 Hz on
   HDMI0). `1920x1080` is the escape hatch if a 2 GB Pi 4 struggles to
   composite Chromium at 4K; the monitor upscales.

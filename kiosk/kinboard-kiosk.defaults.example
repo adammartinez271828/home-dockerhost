@@ -6,12 +6,15 @@
 # wlroots output name as printed by wlr-randr (Pi 4 HDMI0 = HDMI-A-1).
 KIOSK_OUTPUT=HDMI-A-1
 
-# Portrait rotation: 270 or 90 depending on which way the monitor hangs.
-KIOSK_TRANSFORM=270
+# Portrait rotation: 90 or 270 depending on which way the monitor hangs
+# (90 for the kitchen wall as hung on 2026-09-06).
+KIOSK_TRANSFORM=90
 
-# Chromium --force-device-scale-factor. 2.25 for native 4K (3840x2160);
-# about 1.1 if KIOSK_MODE=1920x1080 is set and the monitor upscales.
-KIOSK_SCALE=2.25
+# Compositor output scale (wlr-randr --scale), i.e. how many physical pixels
+# per CSS pixel. Must be an integer: 2 at native 4K gives a 1080x1920 layout;
+# 1 if KIOSK_MODE=1920x1080 is set and the monitor upscales. Fractional
+# values and Chromium's --force-device-scale-factor both break under Cage.
+KIOSK_SCALE=2
 
 # Optional fixed mode (WIDTHxHEIGHT, or WIDTHxHEIGHT@HZ) passed to wlr-randr.
 # Unset = the output's native/preferred mode. Set 1920x1080 if the Pi 4

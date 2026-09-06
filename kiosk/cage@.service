@@ -1,6 +1,7 @@
 # Cage compositor running the Kinboard kiosk on a VT, as the unprivileged
 # `kiosk` user. From the Cage wiki "Starting Cage on boot with systemd" with
-# ExecStart / User / EnvironmentFile / RestartSec changed. Installed to
+# ExecStart / User / EnvironmentFile / RestartSec changed and the
+# Alias=display-manager.service dropped (systemd cannot alias an instance). Installed to
 # /etc/systemd/system/cage@.service by kiosk/install.sh; instance: cage@tty1.
 [Unit]
 Description=Cage Wayland compositor on %I
@@ -31,5 +32,4 @@ PAMName=cage
 
 [Install]
 WantedBy=graphical.target
-Alias=display-manager.service
 DefaultInstance=tty1
