@@ -13,7 +13,7 @@ Host facts:
 
 | | |
 |---|---|
-| Hardware | Raspberry Pi 4 Model B, 5 V / 3 A USB-C PSU |
+| Hardware | Raspberry Pi 4 Model B, on its own 5 V / 3 A USB-C PSU (the one it ran on as `dockerhost`). It briefly ran off the monitor's USB port until 2026-09-07 without a flagged under-voltage; don't repeat that: a monitor port is under-rated for load spikes and cuts power in standby, which would hard-reset the Pi once a screen-off schedule exists |
 | Boot medium | SanDisk High Endurance 128 GB microSD (`/dev/mmcblk0p2` root) |
 | OS | Raspberry Pi OS Lite 64-bit, Trixie (kernel `6.18.39+rpt-rpi-v8` at install) |
 | Hostname / user | `kitchen-kiosk` / `kiosk` (`kitchen-kiosk.local` via avahi) |
@@ -168,6 +168,7 @@ re-run the install** — never edit the installed copies by hand.
 | `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
 | `cage@.service` | `/etc/systemd/system/cage@.service` (644) | the Cage wiki's unit: `User=kiosk`, `PAMName=cage`, `Conflicts=getty@%i`, `Restart=always`/`RestartSec=3`, `EnvironmentFile=-/etc/default/kinboard-kiosk`; instance `cage@tty1` |
 | `pam.d-cage` | `/etc/pam.d/cage` (644) | `pam_unix` + `pam_systemd`: registers a logind session so wlroots gets the seat without root |
+| `chromium-policy.json` | `/etc/chromium/policies/managed/kinboard-kiosk.json` (644) | managed Chromium policy: home page and new-tab page pinned to `http://kinboard.local/`, `URLBlocklist: *` with only `kinboard.local` / `dockerhost.local` allowed. Added 2026-09-07 after the Home key on the 2.4 GHz-dongle mini keyboard (USB `1997:2433`, `XF86HomePage`) opened Google: `--kiosk` hides the UI but keeps the shortcut, so this makes it a reload of Kinboard and stops any other key (Back, Forward, Search) leaving the dashboard. Static: change it here too if `KIOSK_URL` ever changes |
 | `kinboard-kiosk.defaults.example` | `/etc/default/kinboard-kiosk` **only if absent** | the knobs below; the live copy is the kiosk's own state, so local tuning survives reinstalls |
 | `install.sh` | — | `scp` to a temp dir, `sudo install` each file, `daemon-reload`, `set-default graphical.target`, `enable cage@tty1`; `--restart` (`make kiosk-install R=1`) also restarts the unit. Idempotent |
 
@@ -197,7 +198,7 @@ Day-to-day:
 desk$ make kiosk-status     # systemctl status cage@tty1 + loginctl (expect a kiosk session on seat0/tty1)
 desk$ make kiosk-logs       # journalctl -u cage@tty1 -f (Cage + Chromium stderr)
 desk$ make kiosk-restart    # after editing /etc/default/kinboard-kiosk on the kiosk
-desk$ make kiosk-install R=1  # after editing kiosk/kinboard-kiosk or cage@.service here
+desk$ make kiosk-install R=1  # after editing kiosk/kinboard-kiosk, cage@.service or chromium-policy.json here
 kiosk$ sudo -u kiosk env WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 wlr-randr   # output name, modes, Transform
 ```
 

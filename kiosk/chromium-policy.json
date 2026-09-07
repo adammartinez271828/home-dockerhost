@@ -1,0 +1,7 @@
+{
+  "HomepageLocation": "http://kinboard.local/",
+  "HomepageIsNewTabPage": false,
+  "NewTabPageLocation": "http://kinboard.local/",
+  "URLBlocklist": ["*"],
+  "URLAllowlist": ["kinboard.local", "dockerhost.local"]
+}
