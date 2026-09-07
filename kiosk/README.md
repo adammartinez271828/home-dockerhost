@@ -165,14 +165,17 @@ re-run the install** — never edit the installed copies by hand.
 
 | Tracked file | Installed as | What it is |
 |---|---|---|
-| `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
+| `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, runs `kinboard-kiosk-screen auto` so a (re)start inside the off window stays dark, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
+| `kinboard-kiosk-screen` | `/usr/local/bin/kinboard-kiosk-screen` (755) | `off` / `on` / `auto` / `status`: disables or re-enables the wlroots output (`wlr-randr --off`; `--on` re-applies transform/scale/mode). No signal → the BenQ drops into its own standby; Chromium keeps running so the page is current when the picture returns. `auto` compares the clock with `KIOSK_SCREEN_OFF/ON` and only acts on a mismatch; it also re-applies transform/scale when they drift, so an **HDMI hotplug self-heals within a minute** (unplugging makes wlroots destroy the output and the replug creates a fresh one at transform normal / scale 1 while Cage and Chromium keep running; bit us moving the display on 2026-09-07) |
+| `kinboard-kiosk-screen.service` + `.timer` | `/etc/systemd/system/` (644) | minutely timer running `kinboard-kiosk-screen auto` as `kiosk` inside the Cage session (`Requisite=cage@tty1`). Idempotent, so it rides through reboots, compositor restarts, DST and knob edits with no reload |
 | `cage@.service` | `/etc/systemd/system/cage@.service` (644) | the Cage wiki's unit: `User=kiosk`, `PAMName=cage`, `Conflicts=getty@%i`, `Restart=always`/`RestartSec=3`, `EnvironmentFile=-/etc/default/kinboard-kiosk`; instance `cage@tty1` |
 | `pam.d-cage` | `/etc/pam.d/cage` (644) | `pam_unix` + `pam_systemd`: registers a logind session so wlroots gets the seat without root |
 | `chromium-policy.json` | `/etc/chromium/policies/managed/kinboard-kiosk.json` (644) | managed Chromium policy: home page and new-tab page pinned to `http://kinboard.local/`, `URLBlocklist: *` with only `kinboard.local` / `dockerhost.local` allowed. Added 2026-09-07 after the Home key on the 2.4 GHz-dongle mini keyboard (USB `1997:2433`, `XF86HomePage`) opened Google: `--kiosk` hides the UI but keeps the shortcut, so this makes it a reload of Kinboard and stops any other key (Back, Forward, Search) leaving the dashboard. Static: change it here too if `KIOSK_URL` ever changes |
-| `kinboard-kiosk.defaults.example` | `/etc/default/kinboard-kiosk` **only if absent** | the knobs below; the live copy is the kiosk's own state, so local tuning survives reinstalls |
-| `install.sh` | — | `scp` to a temp dir, `sudo install` each file, `daemon-reload`, `set-default graphical.target`, `enable cage@tty1`; `--restart` (`make kiosk-install R=1`) also restarts the unit. Idempotent |
+| `kinboard-kiosk.defaults.example` | `/etc/default/kinboard-kiosk` **only if absent** | the knobs below; the live copy is the kiosk's own state, so local tuning survives reinstalls (the installer does append the `KIOSK_SCREEN_*` block if it is missing) |
+| `install.sh` | — | `scp` to a temp dir, `sudo install` each file, `daemon-reload`, `set-default graphical.target`, `enable cage@tty1`, `enable --now kinboard-kiosk-screen.timer`; `--restart` (`make kiosk-install R=1`) also restarts the unit. Idempotent |
 
-Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`):
+Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`; the
+`KIOSK_SCREEN_*` pair is picked up within a minute with no restart):
 
 - `KIOSK_OUTPUT` — wlroots output name; Pi 4 HDMI0 (next to USB-C) is `HDMI-A-1`.
 - `KIOSK_TRANSFORM` — `90` (default; what the kitchen wall needed) or `270`:
@@ -191,6 +194,14 @@ Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`):
   HDMI0). `1920x1080` is the escape hatch if a 2 GB Pi 4 struggles to
   composite Chromium at 4K; the monitor upscales.
 - `KIOSK_URL` — `http://kinboard.local/`.
+- `KIOSK_SCREEN_OFF` / `KIOSK_SCREEN_ON` — nightly screen-off window, `HH:MM`
+  local time (`23:00` / `06:00` since 2026-09-07; the kiosk's zone is
+  `America/New_York`, so DST just works). Overnight windows are fine; set
+  either empty for always-on. Only the display sleeps: a Pi 4 has no
+  suspend and no RTC to wake on, and the Pi stays on its own PSU (never the
+  monitor's USB, which cuts power in standby). `make kiosk-screen S=off|on`
+  overrides by hand until the next minute tick disagrees, so for a lasting
+  change edit the knobs.
 
 Day-to-day:
 
@@ -198,7 +209,8 @@ Day-to-day:
 desk$ make kiosk-status     # systemctl status cage@tty1 + loginctl (expect a kiosk session on seat0/tty1)
 desk$ make kiosk-logs       # journalctl -u cage@tty1 -f (Cage + Chromium stderr)
 desk$ make kiosk-restart    # after editing /etc/default/kinboard-kiosk on the kiosk
-desk$ make kiosk-install R=1  # after editing kiosk/kinboard-kiosk, cage@.service or chromium-policy.json here
+desk$ make kiosk-screen      # display state + schedule; S=off / S=on to force, S=auto to re-apply
+desk$ make kiosk-install R=1  # after editing kiosk/kinboard-kiosk, kinboard-kiosk-screen*, cage@.service or chromium-policy.json here
 kiosk$ sudo -u kiosk env WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 wlr-randr   # output name, modes, Transform
 ```
 
@@ -219,7 +231,8 @@ Settings → Devices → `kitchen-kiosk` → **Kiosk mode** on hides the nav
 drawer. Rollback: remove the device; it can rejoin with the code.
 
 Rollback of the whole unit: `sudo systemctl disable --now cage@tty1 &&
-sudo systemctl set-default multi-user.target`.
+sudo systemctl set-default multi-user.target`. Just the schedule: `sudo
+systemctl disable --now kinboard-kiosk-screen.timer` (or empty a `KIOSK_SCREEN_*` knob).
 
 ## Gotchas hit on 2026-09-05
 

@@ -16,7 +16,7 @@ KIOSK_HOST ?= kiosk@kitchen-kiosk.local
         backup-db backup-cloud backup-list backup-prune backup-install backup-status \
         restore-test restore-test-clean dev-setup \
         kinboard-up kinboard-status kinboard-logs \
-        kiosk-install kiosk-restart kiosk-status kiosk-logs kiosk-beszel-install
+        kiosk-install kiosk-restart kiosk-status kiosk-logs kiosk-screen kiosk-beszel-install
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -112,7 +112,7 @@ kinboard-status: ## Show Kinboard container state
 kinboard-logs: ## Follow Kinboard logs (all, or one service: make kinboard-logs S=webapp)
 	cd $(KINBOARD_DIR) && ./start.sh logs $(S)
 
-kiosk-install: ## Deploy kiosk/ (wrapper, cage@.service, PAM) to $(KIOSK_HOST) and enable cage@tty1 (R=1 to restart it too)
+kiosk-install: ## Deploy kiosk/ (wrapper, screen schedule, cage@.service, PAM) to $(KIOSK_HOST) and enable cage@tty1 (R=1 to restart it too)
 	@KIOSK_HOST=$(KIOSK_HOST) ./kiosk/install.sh $(if $(R),--restart,)
 
 kiosk-restart: ## Restart the kiosk compositor (after editing /etc/default/kinboard-kiosk on the kiosk)
@@ -123,6 +123,9 @@ kiosk-status: ## Show the kiosk unit state and logind sessions
 
 kiosk-logs: ## Follow the kiosk compositor + Chromium journal
 	ssh -o BatchMode=yes $(KIOSK_HOST) journalctl -u cage@tty1.service -f
+
+kiosk-screen: ## Kiosk display: S=status (default) | off | on | auto (re-apply the KIOSK_SCREEN_OFF/ON schedule)
+	@ssh -o BatchMode=yes $(KIOSK_HOST) 'env WAYLAND_DISPLAY=wayland-0 XDG_RUNTIME_DIR=/run/user/1000 kinboard-kiosk-screen $(or $(S),status)'
 
 kiosk-beszel-install: ## Install the pinned Beszel agent .deb on $(KIOSK_HOST) (hub KEY read from dockerhost); then Add System in the hub UI
 	@KIOSK_HOST=$(KIOSK_HOST) ./kiosk/install-beszel-agent.sh

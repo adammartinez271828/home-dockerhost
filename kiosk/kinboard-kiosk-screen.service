@@ -1,0 +1,14 @@
+# Applies the kiosk screen schedule (kiosk/kinboard-kiosk-screen auto) as the
+# kiosk user inside the running Cage session. Fired by
+# kinboard-kiosk-screen.timer; installed by kiosk/install.sh.
+[Unit]
+Description=Apply the Kinboard kiosk screen off/on schedule
+After=cage@tty1.service
+Requisite=cage@tty1.service
+
+[Service]
+Type=oneshot
+User=kiosk
+EnvironmentFile=-/etc/default/kinboard-kiosk
+Environment=XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-0
+ExecStart=/usr/local/bin/kinboard-kiosk-screen auto

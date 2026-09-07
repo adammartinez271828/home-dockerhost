@@ -25,3 +25,10 @@ KIOSK_SCALE=3
 
 # Page to show.
 KIOSK_URL=http://kinboard.local/
+
+# Nightly screen-off window, local time (the kiosk is America/New_York, so
+# DST is handled), HH:MM. Applied every minute by kinboard-kiosk-screen.timer
+# and at compositor start; edits here take effect within a minute, no restart
+# needed. Set either one empty to leave the screen always on.
+KIOSK_SCREEN_OFF=23:00
+KIOSK_SCREEN_ON=06:00

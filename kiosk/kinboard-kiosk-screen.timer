@@ -1,0 +1,15 @@
+# Runs kinboard-kiosk-screen.service every minute. The script is idempotent
+# and only touches the output when the wanted state differs, so a minutely
+# tick keeps the schedule right through reboots, compositor restarts, DST and
+# edits to /etc/default/kinboard-kiosk with no daemon-reload. Installed and
+# enabled by kiosk/install.sh.
+[Unit]
+Description=Kinboard kiosk screen schedule tick
+
+[Timer]
+OnCalendar=minutely
+AccuracySec=5s
+Unit=kinboard-kiosk-screen.service
+
+[Install]
+WantedBy=timers.target

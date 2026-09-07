@@ -1,0 +1,96 @@
+#!/bin/sh
+# Turn the kiosk display off/on, or apply the nightly schedule. Installed to
+# /usr/local/bin by kiosk/install.sh; run every minute by
+# kinboard-kiosk-screen.timer (as user kiosk) and once by the kinboard-kiosk
+# wrapper when the compositor starts, so a reboot inside the window stays dark.
+# Knobs come from /etc/default/kinboard-kiosk (KIOSK_SCREEN_OFF/ON, plus the
+# output/transform/scale/mode the wrapper uses). Disabling the wlroots output
+# drops the HDMI signal and the monitor goes to its own standby; Chromium
+# keeps running, so the page is current when the picture returns. `auto` also
+# re-applies transform/scale if they drifted (HDMI hotplug resets them).
+#
+#   kinboard-kiosk-screen off|on|auto|status
+set -eu
+
+# Pick up the knobs when not already in the environment (the timer service and
+# the wrapper get them from EnvironmentFile=; an interactive shell does not).
+if [ -z "${KIOSK_OUTPUT:-}" ] && [ -r /etc/default/kinboard-kiosk ]; then
+	set -a
+	# shellcheck source=/dev/null
+	. /etc/default/kinboard-kiosk
+	set +a
+fi
+OUTPUT="${KIOSK_OUTPUT:-HDMI-A-1}"
+TRANSFORM="${KIOSK_TRANSFORM:-90}"
+SCALE="${KIOSK_SCALE:-3}"
+OFF_AT="${KIOSK_SCREEN_OFF-23:00}"
+ON_AT="${KIOSK_SCREEN_ON-06:00}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+
+# One property of the output ("Enabled:" -> yes/no, "Transform:" -> 90,
+# "Scale:" -> 3.000000); empty if the output is unknown (unplugged).
+prop() {
+	wlr-randr 2>/dev/null | awk -v o="$OUTPUT" -v k="$1:" '
+		$1 == o { f = 1; next }
+		f && /^[^ ]/ { exit }
+		f && $1 == k { print $2; exit }'
+}
+current() { prop Enabled; }
+
+# True when the live transform/scale differ from the knobs. An HDMI unplug
+# makes wlroots destroy the output; the replug creates a fresh one at
+# transform normal / scale 1 while Cage and Chromium keep running, so the
+# wrapper's one-shot wlr-randr never re-runs (seen 2026-09-07).
+geometry_drifted() {
+	t=$(prop Transform); sc=$(prop Scale)
+	[ "$t" != "$TRANSFORM" ] && return 0
+	# wlr-randr prints 3.000000; compare numerically.
+	awk -v a="${sc:-0}" -v b="$SCALE" 'BEGIN { exit (a + 0 == b + 0) ? 1 : 0 }'
+}
+
+# Desired state now: "off" inside the window, else "on". An empty
+# KIOSK_SCREEN_OFF or KIOSK_SCREEN_ON disables the schedule (always on).
+wanted() {
+	[ -n "$OFF_AT" ] && [ -n "$ON_AT" ] || { echo on; return; }
+	now=$(date +%H%M)
+	off=$(printf '%s' "$OFF_AT" | tr -d ':')
+	on=$(printf '%s' "$ON_AT" | tr -d ':')
+	if [ "$off" -gt "$on" ]; then
+		# Overnight window, e.g. 23:00 -> 06:00.
+		if [ "$now" -ge "$off" ] || [ "$now" -lt "$on" ]; then echo off; else echo on; fi
+	else
+		if [ "$now" -ge "$off" ] && [ "$now" -lt "$on" ]; then echo off; else echo on; fi
+	fi
+}
+
+apply() {
+	case "$1" in
+		off) wlr-randr --output "$OUTPUT" --off ;;
+		on)
+			if [ -n "${KIOSK_MODE:-}" ]; then
+				wlr-randr --output "$OUTPUT" --on --mode "$KIOSK_MODE" --transform "$TRANSFORM" --scale "$SCALE"
+			else
+				wlr-randr --output "$OUTPUT" --on --transform "$TRANSFORM" --scale "$SCALE"
+			fi ;;
+	esac
+	echo "kinboard-kiosk-screen: $OUTPUT $1"
+}
+
+case "${1:-}" in
+	off|on) apply "$1" ;;
+	auto)
+		want=$(wanted)
+		state=$(current)
+		[ -n "$state" ] || { echo "kinboard-kiosk-screen: output $OUTPUT not found (compositor not up?)" >&2; exit 1; }
+		# Quiet when nothing changes: this runs every minute.
+		case "$want:$state" in
+			off:yes) apply off ;;
+			on:no) apply on ;;
+			on:yes) if geometry_drifted; then echo "kinboard-kiosk-screen: $OUTPUT transform/scale drifted (hotplug?), re-applying"; apply on; fi ;;
+		esac ;;
+	status)
+		state=$(current)
+		echo "output=$OUTPUT enabled=${state:-unknown} transform=$(prop Transform) scale=$(prop Scale) schedule=off@${OFF_AT:-never} on@${ON_AT:-never} wanted-now=$(wanted)" ;;
+	*) sed -n '2,11p' "$0" >&2; exit 2 ;;
+esac

@@ -17,6 +17,9 @@ if [ -n "${KIOSK_MODE:-}" ]; then
 else
   wlr-randr --output "$OUTPUT" --transform "$TRANSFORM" --scale "$SCALE" || true
 fi
+# Honour the nightly screen schedule at (re)start so a reboot inside the
+# window stays dark (kinboard-kiosk-screen.timer re-checks every minute).
+kinboard-kiosk-screen auto || true
 exec chromium \
   --kiosk --noerrdialogs --disable-infobars --no-first-run \
   --ozone-platform=wayland \

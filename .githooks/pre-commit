@@ -12,7 +12,7 @@ status=0
 
 # --- shellcheck: lint the shell scripts (and this hook) ---
 if command -v shellcheck >/dev/null 2>&1; then
-	if shellcheck scripts/*.sh mdns-aliases/*.sh kiosk/*.sh kiosk/kinboard-kiosk .githooks/pre-commit; then
+	if shellcheck scripts/*.sh mdns-aliases/*.sh kiosk/*.sh kiosk/kinboard-kiosk kiosk/kinboard-kiosk-screen .githooks/pre-commit; then
 		echo "pre-commit: shellcheck OK"
 	else
 		echo "pre-commit: shellcheck FAILED" >&2
