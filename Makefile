@@ -16,7 +16,7 @@ KIOSK_HOST ?= kiosk@kitchen-kiosk.local
         backup-db backup-cloud backup-list backup-prune backup-install backup-status \
         restore-test restore-test-clean dev-setup \
         kinboard-up kinboard-status kinboard-logs \
-        kiosk-install kiosk-restart kiosk-status kiosk-logs
+        kiosk-install kiosk-restart kiosk-status kiosk-logs kiosk-beszel-install
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -123,6 +123,9 @@ kiosk-status: ## Show the kiosk unit state and logind sessions
 
 kiosk-logs: ## Follow the kiosk compositor + Chromium journal
 	ssh -o BatchMode=yes $(KIOSK_HOST) journalctl -u cage@tty1.service -f
+
+kiosk-beszel-install: ## Install the pinned Beszel agent .deb on $(KIOSK_HOST) (hub KEY read from dockerhost); then Add System in the hub UI
+	@KIOSK_HOST=$(KIOSK_HOST) ./kiosk/install-beszel-agent.sh
 
 dev-setup: ## Set up a dev clone: enable pre-commit hooks + check tooling (one-time)
 	@./scripts/dev-setup.sh

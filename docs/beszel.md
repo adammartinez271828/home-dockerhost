@@ -56,6 +56,17 @@ Record the pulled image digests in the commented `# image: ...@sha256` lines in
 `docker-compose.yml` (`docker inspect --format '{{index .RepoDigests 0}}'
 con_beszel` / `con_beszel_agent`).
 
+## Second system: the kitchen kiosk
+
+`kitchen-kiosk` (Pi 4, Wi-Fi, no Docker) runs the native `beszel-agent` .deb,
+installed from the desktop with `make kiosk-beszel-install`
+(`kiosk/install-beszel-agent.sh`, pinned to the same version as the hub and
+agent images here). Unlike the dockerhost agent it listens on TCP 45876 and
+the hub dials it, so add it as **Add System** → `kitchen-kiosk`,
+host `192.168.86.206`, port `45876`. Details and troubleshooting in
+`kiosk/README.md` (*Monitoring*). When bumping Beszel, bump `AGENT_VERSION`
+and `AGENT_SHA256` in that script too and re-run the installer.
+
 ## If something is off
 
 - **systemd panel empty** → `make logs S=beszel_agent`. D-Bus permission

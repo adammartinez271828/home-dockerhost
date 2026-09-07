@@ -22,9 +22,38 @@ Host facts:
 | Access | key-only SSH from the desktop, passwordless sudo (`/etc/sudoers.d/010_kiosk-nopasswd`) |
 | Old SSD | the Pi 4's previous `dockerhost` SSD is unplugged and labelled "dockerhost rollback 2026-09-05". **Never reattach it to this Pi**; with no USB boot device the Pi 4 boots the card |
 
-What this directory holds: this README, and the kiosk wrapper script, systemd
+What this directory holds: this README, the kiosk wrapper script, systemd
 unit, PAM file, defaults example and `install.sh` that deploy it (see
-*Compositor and kiosk unit*).
+*Compositor and kiosk unit*), and `install-beszel-agent.sh` (see
+*Monitoring*).
+
+## Monitoring (Beszel agent)
+
+The kiosk reports to the Beszel hub on `dockerhost` ([docs/beszel.md](../docs/beszel.md)):
+SoC temperature, memory (Chromium runs for weeks), SD-card fill, `wlan0`
+throughput, and the `cage@tty1` / `NetworkManager` / `unattended-upgrades`
+units. Installed 2026-09-06 by
+
+```sh
+desk$ make kiosk-beszel-install       # kiosk/install-beszel-agent.sh
+```
+
+which fetches upstream's `beszel-agent` `.deb` pinned to the hub's version
+(`AGENT_VERSION` + sha256 in the script — bump both together with the
+`henrygd/beszel` image tags), reads the hub's public `KEY` from
+`env.d/beszel.env` on dockerhost over ssh, writes `/etc/beszel-agent.conf`
+(`KEY`, `SERVICE_PATTERNS`) and enables `beszel-agent.service`. The agent
+listens on **TCP 45876** on the LAN and the hub connects *to* it, so the
+kiosk never needs to resolve `beszel.local`; it only answers a hub holding
+the matching private key. Then, once per install, in the hub UI: **Add
+System** → name `kitchen-kiosk`, host `192.168.86.206`, port `45876`.
+
+```sh
+kiosk$ systemctl status beszel-agent; journalctl -u beszel-agent -n 20   # "Starting SSH server addr=:45876" is healthy;
+                                                                          # the "HUB_URL not set" warning is expected (hub-connects mode)
+kiosk$ sudo cat /etc/beszel-agent.conf                                    # KEY must equal `make beszel-key` on dockerhost
+desk$  sudo apt remove beszel-agent   # on the kiosk, to remove; re-run the installer to reinstall/upgrade
+```
 
 ## Day-to-day
 
