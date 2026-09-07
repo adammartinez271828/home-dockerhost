@@ -6,12 +6,12 @@
 set -eu
 OUTPUT="${KIOSK_OUTPUT:-HDMI-A-1}"
 TRANSFORM="${KIOSK_TRANSFORM:-90}"
-SCALE="${KIOSK_SCALE:-2}"
+SCALE="${KIOSK_SCALE:-3}"
 URL="${KIOSK_URL:-http://kinboard.local/}"
 # UI scale is applied as the compositor's output scale, not with Chromium's
 # --force-device-scale-factor: on Ozone/Wayland the latter makes Chromium tag
 # a logical-size buffer with that scale, so the window is drawn at 1/N size.
-# Keep it an integer (2 at 4K): Cage 0.2 has no fractional-scale protocol.
+# Keep it an integer (3 at 4K, chosen on the wall 2026-09-06): Cage 0.2 has no fractional-scale protocol.
 if [ -n "${KIOSK_MODE:-}" ]; then
   wlr-randr --output "$OUTPUT" --mode "$KIOSK_MODE" --transform "$TRANSFORM" --scale "$SCALE" || true
 else

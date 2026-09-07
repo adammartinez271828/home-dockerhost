@@ -149,8 +149,10 @@ Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`):
   purely which way the monitor hangs on the arm; flip it if the page is
   upside-down.
 - `KIOSK_SCALE` — the compositor output scale (`wlr-randr --scale`), an
-  **integer**: `2` at native 4K (a 1080×1920 CSS-px layout); `1` with the
-  1080p fallback. Chromium's `--force-device-scale-factor` is deliberately
+  **integer**: `3` at native 4K (default; a 720×1280 CSS-px layout, where
+  Kinboard stacks its widgets in one column and fills the height), `2` for a
+  two-column 1080×1920 layout that leaves an empty band at the top; `1`
+  with the 1080p fallback. Chromium's `--force-device-scale-factor` is deliberately
   not used: under Ozone/Wayland it tags a logical-size buffer with that
   scale, so Cage draws the window at 1/N size in a corner (2.25 → a third,
   2 → a half; seen 2026-09-06). Fractional values would need

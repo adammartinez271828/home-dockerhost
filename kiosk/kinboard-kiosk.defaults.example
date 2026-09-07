@@ -11,10 +11,12 @@ KIOSK_OUTPUT=HDMI-A-1
 KIOSK_TRANSFORM=90
 
 # Compositor output scale (wlr-randr --scale), i.e. how many physical pixels
-# per CSS pixel. Must be an integer: 2 at native 4K gives a 1080x1920 layout;
-# 1 if KIOSK_MODE=1920x1080 is set and the monitor upscales. Fractional
+# per CSS pixel. Must be an integer. At native 4K: 3 = a 720x1280 layout
+# (Kinboard stacks its widgets in one column and fills the height; chosen
+# 2026-09-06), 2 = a 1080x1920 two-column layout with an empty band at the
+# top. 1 if KIOSK_MODE=1920x1080 is set and the monitor upscales. Fractional
 # values and Chromium's --force-device-scale-factor both break under Cage.
-KIOSK_SCALE=2
+KIOSK_SCALE=3
 
 # Optional fixed mode (WIDTHxHEIGHT, or WIDTHxHEIGHT@HZ) passed to wlr-randr.
 # Unset = the output's native/preferred mode. Set 1920x1080 if the Pi 4
