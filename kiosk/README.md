@@ -145,12 +145,17 @@ unattended-upgrade --dry-run -d 2>&1 | grep 'Allowed origins'` lists both
 ### 5. Kiosk packages
 
 ```sh
-kiosk$ sudo apt install -y cage wlr-randr chromium rpi-chromium-mods seatd libnss-mdns avahi-daemon
+kiosk$ sudo apt install -y cage wlr-randr chromium rpi-chromium-mods seatd libnss-mdns avahi-daemon fonts-noto-color-emoji
 ```
 
 Installed 2026-09-05: cage `0.2.0-2+rpt1+b1`, wlr-randr `0.4.1-1`, chromium
 `1:152.0.7977.75-1~deb13u1+rpt1`, rpi-chromium-mods `20260211`, seatd
 `0.9.1-1` (enabled and active), libnss-mdns `0.15.1-4+b1`, avahi-daemon `0.8-16`.
+Added 2026-09-07: fonts-noto-color-emoji `2.051-0+deb13u1` — Pi OS Lite ships
+no emoji font (only DejaVu/Liberation), so Kinboard event titles like
+"🌹 No School" rendered as tofu boxes. Chromium only sees new fonts after a
+restart (`make kiosk-restart`); check with `fc-match ':charset=1f339'` →
+`NotoColorEmoji.ttf`.
 
 Check: `cage -v`, `chromium --version`; from the kiosk
 `curl -s -o /dev/null -w '%{http_code}\n' http://kinboard.local/` → `200`,
