@@ -75,7 +75,17 @@ apply() {
 				wlr-randr --output "$OUTPUT" --on --mode "$KIOSK_MODE" --transform "$TRANSFORM" --scale "$SCALE"
 			else
 				wlr-randr --output "$OUTPUT" --on --transform "$TRANSFORM" --scale "$SCALE"
-			fi ;;
+			fi
+			# Nudge the scale so Chromium re-renders at it. While the output
+			# is off its surface is on no output, Chromium drops to scale 1,
+			# and re-entering an output at scale 3 does not make it redraw:
+			# the compositor upscales the 1x buffer and the page looks
+			# grainy until the next scale *change* (seen 2026-09-12).
+			if [ "$SCALE" = 1 ]; then alt=2; else alt=1; fi
+			sleep 2
+			wlr-randr --output "$OUTPUT" --scale "$alt"
+			sleep 1
+			wlr-randr --output "$OUTPUT" --scale "$SCALE" ;;
 	esac
 	echo "kinboard-kiosk-screen: $OUTPUT $1"
 }

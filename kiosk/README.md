@@ -261,6 +261,21 @@ as belt and braces. Test it with `make kiosk-screen S=off` and watch
 `make kiosk-screen` for a minute; the timer flips it back on at the next tick
 during the day, so read the `enabled=` line before that.
 
+## Gotcha hit on 2026-09-12: the morning picture was grainy (Chromium at 1x)
+
+After the screen came back at 06:00 every edge was a soft staircase, as if
+the page were rendered at a third of the resolution. It was: while the
+output is disabled Chromium's surface sits on no output, so Chromium drops
+to scale 1, and re-entering the output at scale 3 does not make it redraw.
+Cage then upscales the 1x buffer 3x. A `grim` screenshot shows it (crisp
+right after a compositor restart, soft again after one off/on cycle). Only
+a scale *change* triggers a redraw, so `kinboard-kiosk-screen on` now
+nudges the output to another scale and back two seconds after enabling
+it; the page relayouts once and is crisp. Cage 0.2 has no
+`wlr-output-power-management` (so `wlopm`, which would have kept the output
+enabled, is not an option). To check: `grim /tmp/s.png` on the kiosk and
+zoom into text.
+
 ## Gotchas hit on 2026-09-05
 
 - **Pi 4 would not boot the card** (ACT LED dark): the EEPROM had a USB-only
