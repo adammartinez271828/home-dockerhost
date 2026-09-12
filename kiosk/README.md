@@ -177,7 +177,7 @@ re-run the install** — never edit the installed copies by hand.
 | `pam.d-cage` | `/etc/pam.d/cage` (644) | `pam_unix` + `pam_systemd`: registers a logind session so wlroots gets the seat without root |
 | `chromium-policy.json` | `/etc/chromium/policies/managed/kinboard-kiosk.json` (644) | managed Chromium policy: home page and new-tab page pinned to `http://kinboard.local/`, `URLBlocklist: *` with only `kinboard.local` / `dockerhost.local` allowed. Added 2026-09-07 after the Home key on the 2.4 GHz-dongle mini keyboard (USB `1997:2433`, `XF86HomePage`) opened Google: `--kiosk` hides the UI but keeps the shortcut, so this makes it a reload of Kinboard and stops any other key (Back, Forward, Search) leaving the dashboard. Static: change it here too if `KIOSK_URL` ever changes |
 | `kinboard-kiosk.defaults.example` | `/etc/default/kinboard-kiosk` **only if absent** | the knobs below; the live copy is the kiosk's own state, so local tuning survives reinstalls (the installer does append the `KIOSK_SCREEN_*` block if it is missing) |
-| `install.sh` | — | `scp` to a temp dir, `sudo install` each file, `daemon-reload`, `set-default graphical.target`, `enable cage@tty1`, `enable --now kinboard-kiosk-screen.timer`; `--restart` (`make kiosk-install R=1`) also restarts the unit. Idempotent |
+| `install.sh` | — | `scp` to a temp dir, `sudo install` each file, pin the HDMI connector as connected (`video=HDMI-A-1:e` appended to `/boot/firmware/cmdline.txt`, and `echo on > /sys/kernel/debug/dri/*/HDMI-A-1/force` for the running kernel — see the 2026-09-10 gotcha), `daemon-reload`, `set-default graphical.target`, `enable cage@tty1`, `enable --now kinboard-kiosk-screen.timer`; `--restart` (`make kiosk-install R=1`) also restarts the unit. Idempotent |
 
 Knobs in `/etc/default/kinboard-kiosk` (apply with `make kiosk-restart`; the
 `KIOSK_SCREEN_*` pair is picked up within a minute with no restart):
@@ -238,6 +238,28 @@ drawer. Rollback: remove the device; it can rejoin with the code.
 Rollback of the whole unit: `sudo systemctl disable --now cage@tty1 &&
 sudo systemctl set-default multi-user.target`. Just the schedule: `sudo
 systemctl disable --now kinboard-kiosk-screen.timer` (or empty a `KIOSK_SCREEN_*` knob).
+
+## Gotcha hit on 2026-09-10: the screen-off schedule flashed the display back on every minute
+
+Symptom: inside the off window the monitor woke every minute for ~45 s showing
+the page sideways and washed out, then went dark again. The journal had
+`HDMI-A-1 off` from the timer 420 times in one night. Cause: ~14 s after
+losing signal the BenQ pulses its hotplug line as it enters standby
+(`udevadm monitor` shows two DRM `change` uevents 70–225 ms apart); wlroots
+treats that as unplug + replug, destroys the output and creates a fresh one,
+and Cage enables it at transform normal / scale 1. The next minute tick
+turned it off again, and round it went. Fix: force the connector status to
+"connected" so wlroots never sees a disconnect — `video=HDMI-A-1:e` on the
+kernel command line (`/boot/firmware/cmdline.txt`, backup alongside as
+`cmdline.txt.bak-2026-09-11`), which `install.sh` now maintains; for the
+running kernel the same is `echo on | sudo tee
+/sys/kernel/debug/dri/1/HDMI-A-1/force`. Verified: after the pin the pulse
+still fires but `wlr-randr` keeps `Enabled: no` through it. Side effect:
+a real unplug no longer destroys the output either, so the replug just
+resumes; the geometry-drift self-heal in `kinboard-kiosk-screen auto` stays
+as belt and braces. Test it with `make kiosk-screen S=off` and watch
+`make kiosk-screen` for a minute; the timer flips it back on at the next tick
+during the day, so read the `enabled=` line before that.
 
 ## Gotchas hit on 2026-09-05
 

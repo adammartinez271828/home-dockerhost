@@ -8,6 +8,9 @@
 # drops the HDMI signal and the monitor goes to its own standby; Chromium
 # keeps running, so the page is current when the picture returns. `auto` also
 # re-applies transform/scale if they drifted (HDMI hotplug resets them).
+# Relies on install.sh pinning the connector "connected" (video=<output>:e):
+# the BenQ pulses hotplug ~14 s into standby, and without the pin wlroots
+# recreated the output enabled, so `off` came back on within a minute.
 #
 #   kinboard-kiosk-screen off|on|auto|status
 set -eu

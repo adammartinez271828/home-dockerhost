@@ -2,8 +2,10 @@
 # Deploy the kiosk unit to kitchen-kiosk over ssh (run from the desktop; the
 # kiosk holds no clone of this repo). Idempotent: `install` overwrites the
 # wrapper, screen script, units, PAM file and Chromium policy; /etc/default/kinboard-kiosk is created only if
-# absent so local tuning survives (missing KIOSK_SCREEN_* knobs are appended). Then daemon-reload, graphical.target,
-# enable cage@tty1. --restart also restarts the unit (needed to pick up a
+# absent so local tuning survives (missing KIOSK_SCREEN_* knobs are appended). It also pins the HDMI connector
+# as "connected" (video=<output>:e on the kernel cmdline, applied live via debugfs too) so the monitor's
+# standby hotplug pulse cannot resurrect a screen that the schedule turned off. Then daemon-reload,
+# graphical.target, enable cage@tty1. --restart also restarts the unit (needed to pick up a
 # changed wrapper or unit; a running kiosk is otherwise left alone).
 #
 #   kiosk/install.sh [--restart]        KIOSK_HOST=kiosk@kitchen-kiosk.local
@@ -57,6 +59,21 @@ ssh "${ssh_opts[@]}" "$KIOSK_HOST" "set -eu; t='$tmp'; u='$UNIT'; r='$restart'
 			echo 'appended KIOSK_SCREEN_OFF/ON defaults to /etc/default/kinboard-kiosk'
 		fi
 	fi
+	# Force the connector status to connected: the BenQ pulses HDMI hotplug ~14 s after it loses
+	# signal (entering standby); wlroots then destroys and recreates the output, which Cage brings back
+	# up enabled at transform normal / scale 1, so a scheduled screen-off flashed back on every minute
+	# (2026-09-10). With the status forced, wlroots sees no change and the output stays off.
+	out=\$(sed -n 's/^KIOSK_OUTPUT=//p' /etc/default/kinboard-kiosk 2>/dev/null | tail -1); out=\${out:-HDMI-A-1}
+	cmdline=/boot/firmware/cmdline.txt
+	if [ -f \"\$cmdline\" ] && ! grep -q \"video=\$out:e\" \"\$cmdline\"; then
+		sudo -n cp -n \"\$cmdline\" \"\$cmdline.bak\"
+		sudo -n sed -i \"1s/[[:space:]]*\$/ video=\$out:e/\" \"\$cmdline\"
+		echo \"appended video=\$out:e to \$cmdline (persists from the next reboot)\"
+	fi
+	for f in /sys/kernel/debug/dri/*/\"\$out\"/force; do
+		[ -e \"\$f\" ] || continue
+		[ \"\$(sudo -n cat \"\$f\")\" = on ] || { echo on | sudo -n tee \"\$f\" >/dev/null && echo \"forced \$out connected now via \$f\"; }
+	done
 	sudo -n systemctl daemon-reload
 	[ \"\$(systemctl get-default)\" = graphical.target ] || sudo -n systemctl set-default graphical.target
 	sudo -n systemctl enable \"\$u\" 2>&1 | grep -v '^\$' || true
