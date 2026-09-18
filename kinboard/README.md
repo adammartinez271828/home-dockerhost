@@ -10,7 +10,7 @@ the app, so the checkout and the image tag must move together.
 
 What this directory holds:
 
-- `upstream/` — the submodule (upstream repo at tag `v1.7.0`). Do not edit
+- `upstream/` — the submodule (upstream repo at tag `v1.10.0`). Do not edit
   files in it; `setup.sh` rewrites `kong.yml` and `diun/diun.yml` in place,
   which is why `.gitmodules` sets `ignore = dirty`.
 - `docker-compose.override.yml` — host override, **copied** into
