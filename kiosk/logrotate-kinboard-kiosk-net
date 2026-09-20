@@ -1,0 +1,13 @@
+# Installed as /etc/logrotate.d/kinboard-kiosk-net by kiosk/install.sh. The
+# watchdog only writes on transitions, trips and captures, so this file stays
+# tiny; four weekly generations are plenty of history for a fault that has
+# happened once.
+/var/log/kinboard-kiosk-net.log {
+	weekly
+	rotate 4
+	compress
+	delaycompress
+	missingok
+	notifempty
+	create 0644 root root
+}

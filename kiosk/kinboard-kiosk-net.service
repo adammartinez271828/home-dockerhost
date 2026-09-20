@@ -1,0 +1,13 @@
+# One tick of the Wi-Fi reachability watchdog (kiosk/kinboard-kiosk-net tick).
+# Fired by kinboard-kiosk-net.timer; installed by kiosk/install.sh. Runs as
+# root: the recovery ladder needs wpa_cli, nmcli, the firmware debugfs and
+# possibly a reboot. Deliberately no Requisite=cage@tty1 -- the watchdog must
+# keep the link alive even when the compositor is down.
+[Unit]
+Description=Kinboard kiosk Wi-Fi reachability watchdog tick
+After=network.target NetworkManager.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/kinboard-kiosk
+ExecStart=/usr/local/bin/kinboard-kiosk-net tick

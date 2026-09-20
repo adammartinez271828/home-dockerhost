@@ -17,14 +17,15 @@ Host facts:
 | Boot medium | SanDisk High Endurance 128 GB microSD (`/dev/mmcblk0p2` root) |
 | OS | Raspberry Pi OS Lite 64-bit, Trixie (kernel `6.18.39+rpt-rpi-v8` at install) |
 | Hostname / user | `kitchen-kiosk` / `kiosk` (`kitchen-kiosk.local` via avahi) |
-| Network | Wi-Fi only, `wlan0` MAC `e4:5f:01:33:86:d0`, SSID `Bean` (5 GHz), lease 192.168.86.206, power save off |
+| Network | Wi-Fi only, `wlan0` MAC `e4:5f:01:33:86:d0`, SSID `Bean` (5 GHz), lease 192.168.86.206, power save off. Watched by `kinboard-kiosk-net` (see *Wi-Fi reachability watchdog*) since 2026-09-19, because the datapath can die silently with every local indicator still reporting a healthy link |
 | Wired MAC | `e4:5f:01:33:86:cf` — gets the old `dockerhost` lease `.197` if a cable is ever plugged in |
 | Access | key-only SSH from the desktop, passwordless sudo (`/etc/sudoers.d/010_kiosk-nopasswd`) |
 | Old SSD | the Pi 4's previous `dockerhost` SSD is unplugged and labelled "dockerhost rollback 2026-09-05". **Never reattach it to this Pi**; with no USB boot device the Pi 4 boots the card |
 
 What this directory holds: this README, the kiosk wrapper script, systemd
 unit, PAM file, defaults example and `install.sh` that deploy it (see
-*Compositor and kiosk unit*), and `install-beszel-agent.sh` (see
+*Compositor and kiosk unit*), the Wi-Fi watchdog script, units and drop-ins
+(see *Wi-Fi reachability watchdog*), and `install-beszel-agent.sh` (see
 *Monitoring*).
 
 ## Monitoring (Beszel agent)
@@ -100,8 +101,14 @@ Check: `ssh -o BatchMode=yes kiosk@kitchen-kiosk.local 'uname -m; grep VERSION_C
 
 ### 3. Pin Kinboard's name and disable Wi-Fi power saving
 
+The pin goes in the **cloud-init template**, not in `/etc/hosts` directly: the
+Imager's user-data sets `manage_etc_hosts: true`, so cloud-init rewrites
+`/etc/hosts` from the template on every boot and an appended line is silently
+lost at the next reboot (see the 2026-09-19 gotcha).
+
 ```sh
-kiosk$ echo "192.168.86.37 kinboard.local" | sudo tee -a /etc/hosts
+kiosk$ printf '\n192.168.86.37 kinboard.local\n' | sudo tee -a /etc/cloud/templates/hosts.debian.tmpl
+kiosk$ sudo cloud-init single --name update_etc_hosts --frequency always   # render it now
 kiosk$ sudo nmcli connection modify netplan-wlan0-bean 802-11-wireless.powersave 2   # 2 = disable
 kiosk$ sudo nmcli connection up netplan-wlan0-bean
 ```
@@ -109,6 +116,8 @@ kiosk$ sudo nmcli connection up netplan-wlan0-bean
 Check: `getent hosts kinboard.local` → `192.168.86.37` even with
 `sudo systemctl stop avahi-daemon.socket avahi-daemon.service` (start them
 again afterwards); `/usr/sbin/iw dev wlan0 get power_save` → `Power save: off`.
+A drop-in in `/etc/cloud/cloud.cfg.d/` does **not** work for this — datasource
+user-data outranks it, as `sudo cloud-init query merged_cfg` shows.
 
 ### 4. Base config: updates, unattended upgrades, HDMI audio off, SD-wear
 
@@ -142,6 +151,16 @@ Check after reboot: `aplay -l` → `no soundcards found`; `journalctl
 unattended-upgrade --dry-run -d 2>&1 | grep 'Allowed origins'` lists both
 `origin=Debian` and `origin=Raspberry Pi Foundation`.
 
+`make kiosk-install` adds a second drop-in,
+`/etc/apt/apt.conf.d/52kinboard-kiosk` (tracked as
+`kiosk/apt.conf.d-kinboard-kiosk`), blacklisting **`wpasupplicant` and
+`network-manager`**: an unattended upgrade of either restarts the Wi-Fi
+stack under the running kiosk, which on 2026-09-19 happened nine hours
+before the silent link death (no causal link proved, but not a risk worth
+carrying for an unattended box). Both are therefore upgraded **by hand**,
+at a reboot: `sudo apt install wpasupplicant network-manager && sudo
+reboot`. Check with `apt-config dump | grep -A3 Package-Blacklist`.
+
 ### 5. Kiosk packages
 
 ```sh
@@ -173,6 +192,7 @@ re-run the install** — never edit the installed copies by hand.
 | `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, runs `kinboard-kiosk-screen auto` so a (re)start inside the off window stays dark, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
 | `kinboard-kiosk-screen` | `/usr/local/bin/kinboard-kiosk-screen` (755) | `off` / `on` / `auto` / `status`: disables or re-enables the wlroots output (`wlr-randr --off`; `--on` re-applies transform/scale/mode). No signal → the BenQ drops into its own standby; Chromium keeps running so the page is current when the picture returns. `auto` compares the clock with `KIOSK_SCREEN_OFF/ON` and only acts on a mismatch; it also re-applies transform/scale when they drift, so an **HDMI hotplug self-heals within a minute** (unplugging makes wlroots destroy the output and the replug creates a fresh one at transform normal / scale 1 while Cage and Chromium keep running; bit us moving the display on 2026-09-07) |
 | `kinboard-kiosk-screen.service` + `.timer` | `/etc/systemd/system/` (644) | minutely timer running `kinboard-kiosk-screen auto` as `kiosk` inside the Cage session (`Requisite=cage@tty1`). Idempotent, so it rides through reboots, compositor restarts, DST and knob edits with no reload |
+| `kinboard-kiosk-net` + `.service` + `.timer`, `logrotate-kinboard-kiosk-net`, `apt.conf.d-kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk-net` (755), `/etc/systemd/system/` (644), `/etc/logrotate.d/kinboard-kiosk-net` (644), `/etc/apt/apt.conf.d/52kinboard-kiosk` (644) | the Wi-Fi reachability watchdog and its weekly log rotation, plus the unattended-upgrades blacklist for `wpasupplicant`/`network-manager`. Minutely timer running `kinboard-kiosk-net tick` as **root** (no `Requisite=cage@tty1`: it must run even with the compositor down). See *Wi-Fi reachability watchdog* |
 | `cage@.service` | `/etc/systemd/system/cage@.service` (644) | the Cage wiki's unit: `User=kiosk`, `PAMName=cage`, `Conflicts=getty@%i`, `Restart=always`/`RestartSec=3`, `EnvironmentFile=-/etc/default/kinboard-kiosk`; instance `cage@tty1` |
 | `pam.d-cage` | `/etc/pam.d/cage` (644) | `pam_unix` + `pam_systemd`: registers a logind session so wlroots gets the seat without root |
 | `chromium-policy.json` | `/etc/chromium/policies/managed/kinboard-kiosk.json` (644) | managed Chromium policy: home page and new-tab page pinned to `http://kinboard.local/`, `URLBlocklist: *` with only `kinboard.local` / `dockerhost.local` allowed. Added 2026-09-07 after the Home key on the 2.4 GHz-dongle mini keyboard (USB `1997:2433`, `XF86HomePage`) opened Google: `--kiosk` hides the UI but keeps the shortcut, so this makes it a reload of Kinboard and stops any other key (Back, Forward, Search) leaving the dashboard. Static: change it here too if `KIOSK_URL` ever changes |
@@ -239,6 +259,84 @@ Rollback of the whole unit: `sudo systemctl disable --now cage@tty1 &&
 sudo systemctl set-default multi-user.target`. Just the schedule: `sudo
 systemctl disable --now kinboard-kiosk-screen.timer` (or empty a `KIOSK_SCREEN_*` knob).
 
+## Wi-Fi reachability watchdog
+
+Why it exists: on 2026-09-19 the kiosk passed no Wi-Fi traffic for 1½ hours
+while `nmcli` said `connected`, `iw` showed the BSSID at −57 dBm and the
+lease and default route were intact — it could not even ARP its own gateway
+(`docs/kiosk-wifi-silent-link-death.md`). Nothing retried, because on this
+hardware **nothing in the Linux stack watches the datapath**: `brcmfmac` is
+FullMAC, so link monitoring lives in the firmware and it watches *beacons*,
+which kept arriving. The only signal that distinguishes a live link from a
+dead one is whether packets come back, so the watchdog keys on reachability
+and never on NM/`iw` state.
+
+What it does, every minute (`kinboard-kiosk-net.timer` →
+`kinboard-kiosk-net tick`, as **root**):
+
+1. If `nmcli` does not report the interface `connected`, log once and do
+   nothing — NM is already retrying; this watchdog is only for the *silent*
+   failure.
+2. `ping -I wlan0 -c 2 -W 2 <gateway>`. Binding to the interface is
+   essential: with the diagnostic Ethernet cable plugged in an unbound ping
+   succeeds over `eth0` and hides the fault.
+3. After `KIOSK_NET_FAILS` (5) consecutive failed minutes it **trips**: logs
+   `TRIP #N`, writes a capture (below), then climbs the ladder —
+   `wpa_cli -i wlan0 reassociate`, wait 15 s, re-check (`FIXED-BY
+   reassociate`); else `nmcli connection down/up netplan-wlan0-bean`, wait
+   20 s, re-check (`FIXED-BY down-up`); else `BOUNCE FAILED (bounces=N)`.
+4. After `KIOSK_NET_MAX_BOUNCES` (3) failed bounce cycles it logs `REBOOT`,
+   `sync`s and reboots — roughly 3×(5+1) ≈ 18 min after onset. Set the knob
+   to `0` to never reboot. The bounce count resets after 30 min of
+   continuous success.
+
+The log is `/var/log/kinboard-kiosk-net.log` (append-only, rotated weekly ×4
+by `/etc/logrotate.d/kinboard-kiosk-net`). It is written **only** on state
+changes, trips and captures — never on a quiet tick — because the journal is
+volatile (so evidence must reach the card) but the card is otherwise
+deliberately spared. Per-boot counters live in `/run/kinboard-kiosk-net/`
+(tmpfs): `state`, `fails`, `bounces`, `last_ok`, `ok_since`.
+
+Knobs in `/etc/default/kinboard-kiosk` (picked up on the next tick, no
+restart; `kiosk/kinboard-kiosk.defaults.example` documents each one):
+`KIOSK_NET_IFACE` (`wlan0`), `KIOSK_NET_CONNECTION`
+(`netplan-wlan0-bean`), `KIOSK_NET_TARGET` (empty = the default gateway on
+that interface), `KIOSK_NET_ALSO` (`192.168.86.37` — pinged and logged in the
+capture only, never gating), `KIOSK_NET_FAILS` (5), `KIOSK_NET_MAX_BOUNCES`
+(3), `KIOSK_NET_LOG`.
+
+```sh
+desk$ make kiosk-net            # state / fails / bounces / target / bssid / last event
+desk$ make kiosk-net S=check    # exit 0 = the datapath is alive right now
+desk$ make kiosk-net S=capture  # append an evidence block by hand
+desk$ make kiosk-net-log N=200  # tail the evidence log
+```
+
+**Reading a capture.** The block is delimited by `===== kinboard-kiosk-net
+capture <ts> =====`. What each part settles:
+
+- `iw station dump` — `tx failed`, `inactive time` and the rx/tx packet
+  counts come from the **firmware**, unlike the netdev counters in `ip -s
+  link`, which are meaningless on a FullMAC chip (the "zero TX errors"
+  during the 2026-09-19 outage proved nothing). Climbing `tx failed` with a
+  healthy `signal` means frames are leaving and not being ACKed.
+- `iw info` / the scan block — channel, width and (if the AP publishes them)
+  channel utilisation and station count, i.e. whether the AP changed
+  underneath the client or is saturated.
+- the debugfs `counters` / `forensics` files — brcmfmac firmware-internal
+  state; the firmware's own view of a stall.
+- the wpa_supplicant/NetworkManager journal tail — look for a **BSS TM**
+  (802.11v steering) request just before the failure, and for whether a
+  `Group rekeying completed` line was due. Either would point at the AP.
+- **Which rung fixed it is itself evidence.** `FIXED-BY reassociate` (the
+  client re-associates, no new key exchange with NM) points at the AP having
+  forgotten or blocked the station, i.e. hypothesis 2. Only `FIXED-BY
+  down-up` working, after a reassociate did not, points at a client firmware
+  datapath stall cleared by a full disassociate/associate, i.e. hypothesis 3.
+
+Rollback: `sudo systemctl disable --now kinboard-kiosk-net.timer`, or set
+`KIOSK_NET_MAX_BOUNCES=0` to keep the watchdog but never let it reboot.
+
 ## Gotcha hit on 2026-09-10: the screen-off schedule flashed the display back on every minute
 
 Symptom: inside the off window the monitor woke every minute for ~45 s showing
@@ -275,6 +373,42 @@ it; the page relayouts once and is crisp. Cage 0.2 has no
 `wlr-output-power-management` (so `wlopm`, which would have kept the output
 enabled, is not an option). To check: `grim /tmp/s.png` on the kiosk and
 zoom into text.
+
+## Gotchas hit on 2026-09-19
+
+- **The Wi-Fi link can die silently, and nothing notices.** At 15:15 the kiosk
+  stopped passing traffic and stayed that way for 1½ h, still powered and
+  rendering. Every local indicator looked healthy: `nmcli` said
+  `wlan0 connected`, `iw dev wlan0 link` showed the BSSID at -57 dBm, the
+  `.206` lease and default route were present, and `ip -s link` counted zero
+  TX/RX errors — but `ping -I wlan0 192.168.86.1` could not even ARP the
+  gateway. NetworkManager and wpa_supplicant logged **nothing**, so neither
+  ever retried, and the Pi never self-healed.
+  The trigger is **not known**. A failed WPA group rekey was the first
+  theory and is wrong: the Nest rekeys the GTK once a day at 10:48 (seen on
+  the 17th, 18th and 19th), and a bad GTK cannot break the kiosk's own
+  unicast ARP to the gateway anyway. The kiosk was associated to the Nest
+  router itself, not a mesh point. The only Pi-side change that day was
+  unattended-upgrades restarting `wpasupplicant` (2:2.10-24+rpt1) at 06:19,
+  nine hours earlier; no causal link found. Details and the open hypotheses
+  in `docs/kiosk-wifi-silent-link-death.md`.
+  Fix in the moment: `sudo nmcli connection down netplan-wlan0-bean && sudo
+  nmcli connection up netplan-wlan0-bean` — no reboot needed. Diagnosing it
+  needs the temporary Ethernet cable again, and the journal is volatile, so
+  get in **before** power-cycling or the evidence is gone. SmokePing's
+  `kitchen_kiosk` target on the Pi is what dates the outage:
+  `docker exec con_smokeping rrdtool fetch /data/path/kitchen_kiosk.rrd AVERAGE -r 300 -s -48h`.
+  Durable fix, built the same day: the **[Wi-Fi reachability
+  watchdog](#wi-fi-reachability-watchdog)** now pings the gateway every
+  minute, bounces the link after 5 failed minutes and writes the evidence to
+  `/var/log/kinboard-kiosk-net.log`, which survives a power cycle.
+- **`/etc/hosts` edits do not survive a reboot.** The Imager's user-data sets
+  cloud-init's `manage_etc_hosts: true`, so `/etc/hosts` is regenerated from
+  `/etc/cloud/templates/hosts.debian.tmpl` at every boot. The `kinboard.local`
+  pin added in step 3 was therefore wiped by the 2026-09-17 04:00
+  unattended-upgrades reboot, leaving the kiosk on mDNS alone — which is why
+  the screen showed `DNS_PROBE_STARTED` rather than a connection timeout once
+  Wi-Fi died. Step 3 now writes the template instead.
 
 ## Gotchas hit on 2026-09-05
 

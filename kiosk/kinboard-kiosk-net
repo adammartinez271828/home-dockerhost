@@ -1,0 +1,229 @@
+#!/bin/sh
+# Watchdog for the kiosk's Wi-Fi datapath. Pings the gateway *bound to the
+# interface* every minute and, after KIOSK_NET_FAILS consecutive failures,
+# writes a forensic capture to KIOSK_NET_LOG and walks a recovery ladder:
+# wpa_cli reassociate -> nmcli connection down/up -> reboot after
+# KIOSK_NET_MAX_BOUNCES failed cycles. Built after 2026-09-19, when the link
+# passed no traffic for 1.5 h while NM, wpa_supplicant and the FullMAC
+# firmware all reported a healthy association and nothing ever retried
+# (docs/kiosk-wifi-silent-link-death.md). Runs as root from
+# kinboard-kiosk-net.timer; knobs (KIOSK_NET_*) live in
+# /etc/default/kinboard-kiosk. The log is written only on state changes,
+# trips and captures -- never on a quiet tick, to spare the SD card.
+#
+#   kinboard-kiosk-net tick|check|capture|status
+set -eu
+
+# Pick up the knobs when not already in the environment (the timer service
+# gets them from EnvironmentFile=; an interactive shell does not).
+if [ -z "${KIOSK_NET_IFACE:-}" ] && [ -r /etc/default/kinboard-kiosk ]; then
+	set -a
+	# shellcheck source=/dev/null
+	. /etc/default/kinboard-kiosk
+	set +a
+fi
+IFACE="${KIOSK_NET_IFACE:-wlan0}"
+CONN="${KIOSK_NET_CONNECTION:-netplan-wlan0-bean}"
+ALSO="${KIOSK_NET_ALSO-192.168.86.37}"
+FAILS_MAX="${KIOSK_NET_FAILS:-5}"
+MAX_BOUNCES="${KIOSK_NET_MAX_BOUNCES:-3}"
+LOG="${KIOSK_NET_LOG:-/var/log/kinboard-kiosk-net.log}"
+# State lives on tmpfs: it is per-boot by design and must not touch the card.
+STATE_DIR=/run/kinboard-kiosk-net
+# The kiosk user's PATH has neither, and this also runs from systemd.
+PATH="$PATH:/usr/sbin:/sbin"
+export PATH
+IW=/usr/sbin/iw
+
+# --- state -----------------------------------------------------------------
+
+sget() { cat "$STATE_DIR/$1" 2>/dev/null || printf '%s\n' "${2:-}"; }
+sset() { mkdir -p "$STATE_DIR"; printf '%s\n' "$2" >"$STATE_DIR/$1"; }
+log() { printf '%s %s\n' "$(date -Is)" "$*" >>"$LOG"; }
+
+# Ping target: the knob, else the default gateway reachable over $IFACE.
+target() {
+	if [ -n "${KIOSK_NET_TARGET:-}" ]; then
+		printf '%s\n' "$KIOSK_NET_TARGET"
+		return 0
+	fi
+	ip -4 route show default dev "$IFACE" 2>/dev/null | awk '/via/ { print $3; exit }'
+	return 0
+}
+
+# One-line radio summary for the log.
+radio() {
+	"$IW" dev "$IFACE" link 2>/dev/null | awk '
+		/^Connected to/ { b = $3 }
+		$1 == "signal:" { s = $2 $3 }
+		END { printf "bssid=%s signal=%s\n", (b ? b : "none"), (s ? s : "n/a") }' || true
+	return 0
+}
+
+# --- check -----------------------------------------------------------------
+
+# Binding to the interface is essential: with the diagnostic Ethernet cable
+# plugged in an unbound ping succeeds over eth0 and hides the fault.
+check() {
+	t=$(target)
+	[ -n "$t" ] || return 1
+	ping -I "$IFACE" -c 2 -W 2 "$t" >/dev/null 2>&1
+}
+
+# --- capture ---------------------------------------------------------------
+
+# Appends a delimited evidence block to the log. Every command is tolerant of
+# a missing tool: the recovery ladder must run even if nothing can be
+# captured. See kiosk/README.md, "Wi-Fi reachability watchdog", for how to
+# read it.
+capture() {
+	t=$(target)
+	{
+		echo "===== kinboard-kiosk-net capture $(date -Is) ====="
+		echo "-- host: $(uptime -p 2>/dev/null || true)"
+		echo "-- state: state=$(sget state) fails=$(sget fails 0) bounces=$(sget bounces 0) last_ok=$(sget last_ok) target=${t:-none}"
+		echo "-- nmcli dev"
+		nmcli -t -f DEVICE,TYPE,STATE,CONNECTION dev 2>&1 || true
+		echo "-- iw link"
+		"$IW" dev "$IFACE" link 2>&1 || true
+		echo "-- iw info"
+		"$IW" dev "$IFACE" info 2>&1 || true
+		echo "-- iw station dump (tx failed / inactive time / packet counts)"
+		"$IW" dev "$IFACE" station dump 2>&1 || true
+		echo "-- wpa_cli status"
+		wpa_cli -i "$IFACE" status 2>&1 | grep -vE 'psk|^address' || true
+		echo "-- ip"
+		ip -s -s link show "$IFACE" 2>&1 || true
+		ip -4 addr show "$IFACE" 2>&1 || true
+		ip route show dev "$IFACE" 2>&1 || true
+		ip neigh show dev "$IFACE" 2>&1 || true
+		echo "-- ping"
+		if [ -n "$t" ]; then
+			ping -I "$IFACE" -c 2 -W 2 "$t" 2>&1 | tail -3 || true
+		else
+			echo "no target"
+		fi
+		if [ -n "$ALSO" ]; then
+			echo "-- ping $ALSO"
+			ping -I "$IFACE" -c 2 -W 2 "$ALSO" 2>&1 | tail -3 || true
+		fi
+		echo "-- scan"
+		"$IW" dev "$IFACE" scan 2>&1 |
+			grep -E '^BSS|freq:|signal:|SSID:|primary channel|center freq|width|channel utilisation|station count' || true
+		echo "-- brcmfmac debugfs counters"
+		cat /sys/kernel/debug/ieee80211/phy0/counters 2>&1 || true
+		echo "-- brcmfmac debugfs forensics (tail)"
+		tail -20 /sys/kernel/debug/ieee80211/phy0/forensics 2>&1 || true
+		echo   # the firmware files have no trailing newline
+		echo "-- journal (wpa_supplicant + NetworkManager)"
+		journalctl -b -o short-iso -u wpa_supplicant -u NetworkManager -n 40 2>&1 || true
+		echo "-- throttled: $(vcgencmd get_throttled 2>&1 || true)"
+		echo "===== end capture ====="
+	} >>"$LOG" 2>&1
+}
+
+# --- tick ------------------------------------------------------------------
+
+tick() {
+	mkdir -p "$STATE_DIR"
+	now=$(date +%s)
+	state=$(sget state ok)
+	fails=$(sget fails 0)
+	bounces=$(sget bounces 0)
+
+	# NM not activated: NM is already retrying, and this watchdog exists only
+	# for the *silent* failure where everything claims to be healthy.
+	if ! nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep -q "^$IFACE:connected$"; then
+		[ "$state" = nm ] || log "NM not activated on $IFACE, leaving it to NM"
+		sset fails 0
+		sset state nm
+		return 0
+	fi
+
+	if check; then
+		ok_since=$(sget ok_since 0)
+		if [ "$state" != ok ]; then
+			# Minutes since the last good tick (fails is 0 after a failed bounce).
+			last_ok=$(sget last_ok 0)
+			[ "${last_ok:-0}" -gt 0 ] && down=$(( (now - last_ok) / 60 )) || down="${fails:-0}"
+			[ "$state" = nm ] || log "RECOVERED after ${down} min down"
+			ok_since=$now
+		fi
+		[ "${ok_since:-0}" -gt 0 ] || ok_since=$now
+		# Clear the bounce count only after 30 min of continuous success.
+		if [ "${bounces:-0}" -gt 0 ] && [ $(( now - ok_since )) -ge 1800 ]; then
+			log "bounces reset after 30 min of continuous success"
+			sset bounces 0
+		fi
+		sset ok_since "$ok_since"
+		sset fails 0
+		sset state ok
+		sset last_ok "$now"
+		return 0
+	fi
+
+	fails=$(( ${fails:-0} + 1 ))
+	sset fails "$fails"
+	sset state fail
+	sset ok_since 0
+	if [ "$fails" -eq 1 ]; then
+		log "FAIL started (target=$(target)) $(radio)"
+	fi
+	[ "$fails" -ge "$FAILS_MAX" ] || return 0
+
+	# --- trip: capture, then the recovery ladder ---
+	log "TRIP #$(( ${bounces:-0} + 1 )) after $fails failed min"
+	capture
+
+	log "ladder: wpa_cli reassociate"
+	wpa_cli -i "$IFACE" reassociate >/dev/null 2>&1 || true
+	sleep 15
+	if check; then
+		log "FIXED-BY reassociate"
+		sset fails 0
+		sset state ok
+		sset last_ok "$(date +%s)"
+		sset ok_since "$(date +%s)"
+		return 0
+	fi
+
+	log "ladder: nmcli connection down/up $CONN"
+	nmcli connection down "$CONN" >/dev/null 2>&1 || true
+	sleep 2
+	nmcli connection up "$CONN" >/dev/null 2>&1 || true
+	sleep 20
+	if check; then
+		log "FIXED-BY down-up"
+		sset fails 0
+		sset state ok
+		sset last_ok "$(date +%s)"
+		sset ok_since "$(date +%s)"
+		return 0
+	fi
+
+	bounces=$(( ${bounces:-0} + 1 ))
+	sset bounces "$bounces"
+	sset fails 0
+	log "BOUNCE FAILED (bounces=$bounces)"
+	if [ "$MAX_BOUNCES" -gt 0 ] && [ "$bounces" -ge "$MAX_BOUNCES" ]; then
+		log "REBOOT after $bounces failed bounce cycles"
+		sync
+		systemctl reboot
+	fi
+	return 0
+}
+
+# --- status ----------------------------------------------------------------
+
+status() {
+	last=$(grep -E 'TRIP|FIXED-BY|RECOVERED|BOUNCE|REBOOT' "$LOG" 2>/dev/null | tail -1 || true)
+	echo "state=$(sget state unknown) fails=$(sget fails 0) bounces=$(sget bounces 0) last_ok=$(sget last_ok none) target=$(target) $(radio) last-event: ${last:-none}"
+}
+
+case "${1:-}" in
+	tick) tick ;;
+	check) check ;;
+	capture) capture; echo "kinboard-kiosk-net: capture appended to $LOG" ;;
+	status) status ;;
+	*) sed -n '2,14p' "$0" >&2; exit 2 ;;
+esac

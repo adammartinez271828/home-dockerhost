@@ -32,3 +32,36 @@ KIOSK_URL=http://kinboard.local/
 # needed. Set either one empty to leave the screen always on.
 KIOSK_SCREEN_OFF=23:00
 KIOSK_SCREEN_ON=06:00
+
+# Wi-Fi reachability watchdog (kinboard-kiosk-net, every minute). Keys on
+# reachability, never on NM/iw state: on 2026-09-19 the datapath died while
+# every local indicator stayed healthy. Edits take effect on the next tick.
+
+# Interface to ping from (the ping is bound to it; an unbound ping would
+# succeed over the diagnostic Ethernet cable and hide the fault) and the
+# NetworkManager connection the ladder bounces.
+KIOSK_NET_IFACE=wlan0
+KIOSK_NET_CONNECTION=netplan-wlan0-bean
+
+# What to ping. Empty = the default gateway on $KIOSK_NET_IFACE, which is the
+# right answer: it is one hop away, so a failure means the radio link, not
+# the internet.
+KIOSK_NET_TARGET=
+
+# A second address pinged and logged in the capture only; it never gates the
+# decision (192.168.86.37 = dockerhost, the Pi 5 serving Kinboard).
+KIOSK_NET_ALSO=192.168.86.37
+
+# Consecutive failed ticks (= minutes) before the watchdog trips. 5 rides out
+# a scan interruption or a brief AP hiccup.
+KIOSK_NET_FAILS=5
+
+# Failed bounce cycles (capture + reassociate + down/up, all of which failed)
+# before rebooting the Pi. 0 = never reboot, just keep bouncing. At the
+# defaults a reboot is roughly 3x(5+1) = 18 min after onset.
+KIOSK_NET_MAX_BOUNCES=3
+
+# Evidence log, append-only, rotated weekly x4 by
+# /etc/logrotate.d/kinboard-kiosk-net. Written only on transitions, trips and
+# captures - never on a quiet tick.
+KIOSK_NET_LOG=/var/log/kinboard-kiosk-net.log

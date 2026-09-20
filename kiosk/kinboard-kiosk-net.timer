@@ -1,0 +1,16 @@
+# Runs kinboard-kiosk-net.service every minute. A tick is quiet and cheap (two
+# pings bound to wlan0) and writes nothing to disk unless the state changes,
+# so a minutely cadence gives the KIOSK_NET_FAILS threshold a one-minute
+# granularity without touching the SD card. Installed and enabled by
+# kiosk/install.sh.
+[Unit]
+Description=Kinboard kiosk Wi-Fi reachability watchdog tick
+
+[Timer]
+OnCalendar=minutely
+AccuracySec=5s
+Persistent=false
+Unit=kinboard-kiosk-net.service
+
+[Install]
+WantedBy=timers.target
