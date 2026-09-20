@@ -1,0 +1,15 @@
+# Restarts cage@tty1 once a night at 03:30 local, inside the 23:00-06:00
+# screen-off window (KIOSK_SCREEN_OFF/ON), so the browser starts each day
+# fresh. RandomizedDelaySec keeps it off the exact minute of the other
+# 03:xx system timers. Installed and enabled by kiosk/install.sh.
+[Unit]
+Description=Nightly Kinboard kiosk compositor restart
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=5min
+Persistent=false
+Unit=kinboard-kiosk-restart.service
+
+[Install]
+WantedBy=timers.target

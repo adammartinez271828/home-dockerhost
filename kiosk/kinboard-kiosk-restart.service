@@ -1,0 +1,14 @@
+# Nightly restart of the kiosk compositor (Cage + Chromium), fired by
+# kinboard-kiosk-restart.timer inside the screen-off window. Chromium never
+# reloads a crashed tab ("Aw, Snap!", seen 2026-09-19 20:50) and a binary
+# upgraded under a running browser can crash renderers for hours, so a
+# fresh process every night bounds both. The wrapper re-applies the screen
+# schedule on start, so a restart inside the window stays dark. Installed
+# by kiosk/install.sh.
+[Unit]
+Description=Nightly restart of the Kinboard kiosk compositor
+ConditionPathExists=/usr/local/bin/kinboard-kiosk
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart cage@tty1.service

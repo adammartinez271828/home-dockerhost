@@ -112,7 +112,7 @@ kinboard-status: ## Show Kinboard container state
 kinboard-logs: ## Follow Kinboard logs (all, or one service: make kinboard-logs S=webapp)
 	cd $(KINBOARD_DIR) && ./start.sh logs $(S)
 
-kiosk-install: ## Deploy kiosk/ (wrapper, screen schedule, Wi-Fi watchdog, cage@.service, PAM) to $(KIOSK_HOST) and enable cage@tty1 (R=1 to restart it too)
+kiosk-install: ## Deploy kiosk/ (wrapper, screen schedule, Wi-Fi watchdog, nightly restart, cage@.service, PAM) to $(KIOSK_HOST) and enable cage@tty1 (R=1 to restart it too)
 	@KIOSK_HOST=$(KIOSK_HOST) ./kiosk/install.sh $(if $(R),--restart,)
 
 kiosk-restart: ## Restart the kiosk compositor (after editing /etc/default/kinboard-kiosk on the kiosk)

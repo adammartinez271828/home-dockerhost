@@ -337,6 +337,30 @@ capture <ts> =====`. What each part settles:
 Rollback: `sudo systemctl disable --now kinboard-kiosk-net.timer`, or set
 `KIOSK_NET_MAX_BOUNCES=0` to keep the watchdog but never let it reboot.
 
+## Nightly compositor restart and the stale-Chromium hook
+
+Chromium never reloads a crashed tab: a renderer crash leaves "Aw, Snap!"
+on the wall until something restarts it (seen 2026-09-19 20:50, error
+code 5, with Wi-Fi and Kinboard both healthy). A package upgrade under the
+running browser is one known cause: the old process keeps running from the
+unlinked binary while every new renderer it spawns comes from the new one.
+Two blunt guards, both installed by `install.sh`:
+
+- **`kinboard-kiosk-restart.timer`** restarts `cage@tty1` at 03:30 local
+  (plus up to 5 min jitter), inside the 23:00–06:00 screen-off window, so
+  the browser starts each day fresh. The wrapper re-applies the screen
+  schedule on start, so the restart stays dark.
+- **`kinboard-kiosk-stale-chromium`** runs from the apt `DPkg::Post-Invoke`
+  hook in `/etc/apt/apt.conf.d/52kinboard-kiosk` after every apt run. If the
+  oldest `chromium` process's `/proc/PID/exe` ends in ` (deleted)`, the
+  binary was replaced and it restarts `cage@tty1`; otherwise it does
+  nothing. `sudo kinboard-kiosk-stale-chromium --check` reports without
+  acting.
+
+Check: `systemctl list-timers | grep kinboard-kiosk-restart`;
+`journalctl -u kinboard-kiosk-restart` shows the nightly runs. If the page
+is stuck on "Aw, Snap!" during the day: `make kiosk-restart`.
+
 ## Gotcha hit on 2026-09-10: the screen-off schedule flashed the display back on every minute
 
 Symptom: inside the off window the monitor woke every minute for ~45 s showing
@@ -402,6 +426,11 @@ zoom into text.
   watchdog](#wi-fi-reachability-watchdog)** now pings the gateway every
   minute, bounces the link after 5 failed minutes and writes the evidence to
   `/var/log/kinboard-kiosk-net.log`, which survives a power cycle.
+- **Chromium "Aw, Snap!" (error code 5) at 20:50, everything else healthy.**
+  A renderer crash; Chromium leaves it on screen forever. Crash dumps land in
+  `~kiosk/.config/chromium/Crash Reports/pending/`. Fix in the moment:
+  `make kiosk-restart`. Durable guards: the nightly restart timer and the
+  stale-Chromium apt hook (see *Nightly compositor restart*).
 - **`/etc/hosts` edits do not survive a reboot.** The Imager's user-data sets
   cloud-init's `manage_etc_hosts: true`, so `/etc/hosts` is regenerated from
   `/etc/cloud/templates/hosts.debian.tmpl` at every boot. The `kinboard.local`

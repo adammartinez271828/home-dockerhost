@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Deploy the kiosk unit to kitchen-kiosk over ssh (run from the desktop; the
 # kiosk holds no clone of this repo). Idempotent: `install` overwrites the
-# wrapper, screen script, Wi-Fi watchdog, units, PAM file, logrotate + apt drop-ins and Chromium policy;
+# wrapper, screen script, Wi-Fi watchdog, nightly-restart timer + stale-Chromium hook, units, PAM file,
+# logrotate + apt drop-ins and Chromium policy;
 # /etc/default/kinboard-kiosk is created only if
 # absent so local tuning survives (missing KIOSK_SCREEN_*/KIOSK_NET_* knobs are appended). It also pins the HDMI connector
 # as "connected" (video=<output>:e on the kernel cmdline, applied live via debugfs too) so the monitor's
 # standby hotplug pulse cannot resurrect a screen that the schedule turned off. Then daemon-reload,
-# graphical.target, enable cage@tty1 and the screen/net timers. --restart also restarts the unit (needed to pick up a
+# graphical.target, enable cage@tty1 and the screen/net/restart timers. --restart also restarts the unit (needed to pick up a
 # changed wrapper or unit; a running kiosk is otherwise left alone).
 #
 #   kiosk/install.sh [--restart]        KIOSK_HOST=kiosk@kitchen-kiosk.local
@@ -26,11 +27,12 @@ done
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for f in kinboard-kiosk kinboard-kiosk-screen kinboard-kiosk-screen.service kinboard-kiosk-screen.timer \
 	kinboard-kiosk-net kinboard-kiosk-net.service kinboard-kiosk-net.timer \
+	kinboard-kiosk-restart.service kinboard-kiosk-restart.timer kinboard-kiosk-stale-chromium \
 	logrotate-kinboard-kiosk-net apt.conf.d-kinboard-kiosk \
 	cage@.service pam.d-cage kinboard-kiosk.defaults.example chromium-policy.json; do
 	[ -f "$here/$f" ] || { echo "missing $here/$f" >&2; exit 1; }
 done
-sh -n "$here/kinboard-kiosk" "$here/kinboard-kiosk-screen" "$here/kinboard-kiosk-net"
+sh -n "$here/kinboard-kiosk" "$here/kinboard-kiosk-screen" "$here/kinboard-kiosk-net" "$here/kinboard-kiosk-stale-chromium"
 
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=10)
 tmp="$(ssh "${ssh_opts[@]}" "$KIOSK_HOST" 'mktemp -d /tmp/kinboard-kiosk.XXXXXX')"
@@ -40,6 +42,7 @@ echo "==> copying files to $KIOSK_HOST:$tmp"
 scp -q "${ssh_opts[@]}" "$here/kinboard-kiosk" "$here/kinboard-kiosk-screen" \
 	"$here/kinboard-kiosk-screen.service" "$here/kinboard-kiosk-screen.timer" "$here/cage@.service" \
 	"$here/kinboard-kiosk-net" "$here/kinboard-kiosk-net.service" "$here/kinboard-kiosk-net.timer" \
+	"$here/kinboard-kiosk-restart.service" "$here/kinboard-kiosk-restart.timer" "$here/kinboard-kiosk-stale-chromium" \
 	"$here/logrotate-kinboard-kiosk-net" "$here/apt.conf.d-kinboard-kiosk" \
 	"$here/pam.d-cage" "$here/kinboard-kiosk.defaults.example" "$here/chromium-policy.json" "$KIOSK_HOST:$tmp/"
 
@@ -54,6 +57,9 @@ ssh "${ssh_opts[@]}" "$KIOSK_HOST" "set -eu; t='$tmp'; u='$UNIT'; r='$restart'
 	sudo -n install -m 755 -o root -g root \"\$t/kinboard-kiosk-net\" /usr/local/bin/kinboard-kiosk-net
 	sudo -n install -m 644 -o root -g root \"\$t/kinboard-kiosk-net.service\" /etc/systemd/system/kinboard-kiosk-net.service
 	sudo -n install -m 644 -o root -g root \"\$t/kinboard-kiosk-net.timer\" /etc/systemd/system/kinboard-kiosk-net.timer
+	sudo -n install -m 644 -o root -g root \"\$t/kinboard-kiosk-restart.service\" /etc/systemd/system/kinboard-kiosk-restart.service
+	sudo -n install -m 644 -o root -g root \"\$t/kinboard-kiosk-restart.timer\" /etc/systemd/system/kinboard-kiosk-restart.timer
+	sudo -n install -m 755 -o root -g root \"\$t/kinboard-kiosk-stale-chromium\" /usr/local/bin/kinboard-kiosk-stale-chromium
 	sudo -n install -m 644 -o root -g root \"\$t/logrotate-kinboard-kiosk-net\" /etc/logrotate.d/kinboard-kiosk-net
 	sudo -n install -m 644 -o root -g root \"\$t/apt.conf.d-kinboard-kiosk\" /etc/apt/apt.conf.d/52kinboard-kiosk
 	sudo -n touch /var/log/kinboard-kiosk-net.log
@@ -95,8 +101,10 @@ ssh "${ssh_opts[@]}" "$KIOSK_HOST" "set -eu; t='$tmp'; u='$UNIT'; r='$restart'
 	sudo -n systemctl enable \"\$u\" 2>&1 | grep -v '^\$' || true
 	sudo -n systemctl enable --now kinboard-kiosk-screen.timer 2>&1 | grep -v '^\$' || true
 	sudo -n systemctl enable --now kinboard-kiosk-net.timer 2>&1 | grep -v '^\$' || true
+	sudo -n systemctl enable --now kinboard-kiosk-restart.timer 2>&1 | grep -v '^\$' || true
 	if [ \"\$r\" = 1 ]; then sudo -n systemctl restart \"\$u\"; sleep 3; fi
 	echo \"==> \$u: \$(systemctl is-enabled \"\$u\") / \$(systemctl is-active \"\$u\" || true); default target \$(systemctl get-default)\"
 	echo \"==> kinboard-kiosk-screen.timer: \$(systemctl is-active kinboard-kiosk-screen.timer || true); \$(/usr/local/bin/kinboard-kiosk-screen status 2>&1 || true)\"
+	echo \"==> kinboard-kiosk-restart.timer: \$(systemctl is-active kinboard-kiosk-restart.timer || true), next \$(systemctl show kinboard-kiosk-restart.timer -p NextElapseUSecRealtime --value || true); \$(sudo -n /usr/local/bin/kinboard-kiosk-stale-chromium --check 2>&1 || true)\"
 	echo \"==> kinboard-kiosk-net.timer: \$(systemctl is-active kinboard-kiosk-net.timer || true); \$(sudo -n /usr/local/bin/kinboard-kiosk-net status 2>&1 || true)\"
 "

@@ -1,3 +1,6 @@
 // Installed as /etc/apt/apt.conf.d/52kinboard-kiosk by kiosk/install.sh.
 // Never restart the Wi-Fi stack under the running kiosk (2026-09-19). Upgrade by hand at a reboot.
 Unattended-Upgrade::Package-Blacklist { "wpasupplicant"; "network-manager"; };
+// After any apt/dpkg run, restart the kiosk if Chromium was replaced under
+// the running browser (kiosk/kinboard-kiosk-stale-chromium).
+DPkg::Post-Invoke { "/usr/local/bin/kinboard-kiosk-stale-chromium || true"; };
