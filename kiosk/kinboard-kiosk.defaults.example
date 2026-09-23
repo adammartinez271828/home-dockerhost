@@ -65,3 +65,12 @@ KIOSK_NET_MAX_BOUNCES=3
 # /etc/logrotate.d/kinboard-kiosk-net. Written only on transitions, trips and
 # captures - never on a quiet tick.
 KIOSK_NET_LOG=/var/log/kinboard-kiosk-net.log
+
+# Chromium crash auto-restart (kinboard-kiosk-crash, started by
+# kinboard-kiosk-crash.path when a crash dump appears). Restarts past this
+# many in a rolling hour are skipped and logged, so a tab that crashes on
+# every start cannot restart-loop the browser.
+KIOSK_CRASH_MAX_PER_HOUR=3
+
+# One line per crash, append-only; crashes are rare, so no rotation.
+KIOSK_CRASH_LOG=/var/log/kinboard-kiosk-crash.log

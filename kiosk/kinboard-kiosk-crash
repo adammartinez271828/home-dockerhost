@@ -1,0 +1,47 @@
+#!/bin/sh
+# Restart the kiosk compositor as soon as Chromium writes a crash dump.
+# Chromium never reloads a crashed tab, so a renderer crash otherwise leaves
+# "Aw, Snap!" on the wall until the 03:30 nightly restart (2026-09-23: 13:27
+# to 16:57, and it would have stayed until 03:30). Every crash seen so far
+# (09-07, 09-19, 09-23) dropped a minidump into Crashpad's pending/ folder
+# within the same second, so kinboard-kiosk-crash.path watches that folder
+# and starts this. Runs as root. At most KIOSK_CRASH_MAX_PER_HOUR restarts
+# per rolling hour, so a tab that crashes on every start cannot restart-loop
+# the browser forever; past the cap it logs and leaves the page alone.
+# Knobs live in /etc/default/kinboard-kiosk. The dumps themselves stay in
+# pending/ (Chromium never uploads them here): they are the durable record,
+# since the journal is volatile.
+#
+#   kinboard-kiosk-crash            (what the .service runs)
+set -eu
+
+# Pick up the knobs when not already in the environment (the service gets
+# them from EnvironmentFile=; an interactive shell does not).
+if [ -z "${KIOSK_CRASH_MAX_PER_HOUR:-}" ] && [ -r /etc/default/kinboard-kiosk ]; then
+	# shellcheck disable=SC1091  # host-local file, not in the repo
+	. /etc/default/kinboard-kiosk
+fi
+
+DIR="${KIOSK_CRASH_DIR:-/home/kiosk/.config/chromium/Crash Reports/pending}"
+MAX="${KIOSK_CRASH_MAX_PER_HOUR:-3}"
+LOG="${KIOSK_CRASH_LOG:-/var/log/kinboard-kiosk-crash.log}"
+# Restart history lives on tmpfs: per-boot by design, never on the card.
+HIST=/run/kinboard-kiosk-crash.history
+
+# Crashpad writes the .dmp and then its .meta; let it finish (and let the
+# burst of inotify events settle) before killing the browser under it.
+sleep 5
+
+# shellcheck disable=SC2012  # Crashpad names dumps <uuid>.dmp/.meta; only logged
+newest=$(ls -t "$DIR" 2>/dev/null | head -n 1)
+now=$(date +%s)
+recent=$(awk -v cut=$((now - 3600)) '$1 > cut' "$HIST" 2>/dev/null | wc -l)
+if [ "$recent" -ge "$MAX" ]; then
+	echo "$(date -Iseconds) crash dump ${newest:-?}: $recent restarts in the last hour (cap $MAX), leaving it" >>"$LOG"
+	echo "kinboard-kiosk-crash: restart cap reached ($recent/$MAX in 1 h), not restarting"
+	exit 0
+fi
+echo "$now" >>"$HIST"
+echo "$(date -Iseconds) crash dump ${newest:-?}: restarting cage@tty1" >>"$LOG"
+echo "kinboard-kiosk-crash: crash dump ${newest:-?}, restarting cage@tty1"
+systemctl restart cage@tty1.service

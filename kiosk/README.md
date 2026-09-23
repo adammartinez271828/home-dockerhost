@@ -25,8 +25,9 @@ Host facts:
 What this directory holds: this README, the kiosk wrapper script, systemd
 unit, PAM file, defaults example and `install.sh` that deploy it (see
 *Compositor and kiosk unit*), the Wi-Fi watchdog script, units and drop-ins
-(see *Wi-Fi reachability watchdog*), and `install-beszel-agent.sh` (see
-*Monitoring*).
+(see *Wi-Fi reachability watchdog*), the crash watcher and nightly-restart
+units (see *Crash watcher, nightly restart and the stale-Chromium hook*), and
+`install-beszel-agent.sh` (see *Monitoring*).
 
 ## Monitoring (Beszel agent)
 
@@ -337,14 +338,30 @@ capture <ts> =====`. What each part settles:
 Rollback: `sudo systemctl disable --now kinboard-kiosk-net.timer`, or set
 `KIOSK_NET_MAX_BOUNCES=0` to keep the watchdog but never let it reboot.
 
-## Nightly compositor restart and the stale-Chromium hook
+## Crash watcher, nightly restart and the stale-Chromium hook
 
 Chromium never reloads a crashed tab: a renderer crash leaves "Aw, Snap!"
-on the wall until something restarts it (seen 2026-09-19 20:50, error
-code 5, with Wi-Fi and Kinboard both healthy). A package upgrade under the
-running browser is one known cause: the old process keeps running from the
-unlinked binary while every new renderer it spawns comes from the new one.
-Two blunt guards, both installed by `install.sh`:
+on the wall until something restarts it. Three such crashes so far
+(2026-09-07 16:23, 09-19 20:50, 09-23 13:27), all identical: error code 5
+(SIGTRAP, a deliberate crash) after the browser process failed to hand the
+page a 4 MiB shared-memory block, each during a Kinboard realtime write storm
+(see *Gotchas hit on 2026-09-23*). Three guards, all installed by
+`install.sh`:
+
+- **`kinboard-kiosk-crash.path`** watches Crashpad's
+  `~kiosk/.config/chromium/Crash Reports/pending/`, where every crash so far
+  dropped a minidump within the same second, and starts
+  `kinboard-kiosk-crash.service`, which waits 5 s for the dump to finish and
+  restarts `cage@tty1`. Tested 2026-09-23 by sending the page renderer a
+  SIGTRAP by hand: "Aw, Snap!" at 17:32:27, dashboard back at 17:32:33. At
+  most `KIOSK_CRASH_MAX_PER_HOUR` (default 3) restarts per rolling hour, so a
+  tab that crashes on every start cannot restart-loop the browser; past the
+  cap it logs and waits for the nightly restart. The limit lives in the
+  script, not in `StartLimit*`, because a unit hitting its start limit would
+  leave the `.path` unit failed and the watcher dead until reset. One line
+  per crash goes to `/var/log/kinboard-kiosk-crash.log` (the journal is
+  volatile); the dumps stay in `pending/` as the durable record, since
+  nothing uploads them. `make kiosk-crash-log` shows both.
 
 - **`kinboard-kiosk-restart.timer`** restarts `cage@tty1` at 03:30 local
   (plus up to 5 min jitter), inside the 23:00–06:00 screen-off window, so
@@ -355,11 +372,15 @@ Two blunt guards, both installed by `install.sh`:
   oldest `chromium` process's `/proc/PID/exe` ends in ` (deleted)`, the
   binary was replaced and it restarts `cage@tty1`; otherwise it does
   nothing. `sudo kinboard-kiosk-stale-chromium --check` reports without
-  acting.
+  acting. This is a general precaution: an old browser spawning renderers
+  from a new binary can crash tabs. It was *not* the cause of any crash seen
+  here (it was first blamed for 09-19, wrongly; see that day's gotcha).
 
 Check: `systemctl list-timers | grep kinboard-kiosk-restart`;
-`journalctl -u kinboard-kiosk-restart` shows the nightly runs. If the page
-is stuck on "Aw, Snap!" during the day: `make kiosk-restart`.
+`journalctl -u kinboard-kiosk-restart` shows the nightly runs;
+`systemctl is-active kinboard-kiosk-crash.path` → `active`. If the page is
+stuck on "Aw, Snap!" during the day anyway (restart cap hit, or a crash that
+wrote no dump): `make kiosk-restart`, then `make kiosk-crash-log`.
 
 ## Gotcha hit on 2026-09-10: the screen-off schedule flashed the display back on every minute
 
@@ -398,6 +419,46 @@ it; the page relayouts once and is crisp. Cage 0.2 has no
 enabled, is not an option). To check: `grim /tmp/s.png` on the kiosk and
 zoom into text.
 
+## Gotchas hit on 2026-09-23
+
+- **"Aw, Snap!" (error code 5) at 13:27, found by chance at ~16:50.** Wi-Fi
+  and Kinboard were healthy; the page's renderer had crashed and the only
+  recovery was the 03:30 nightly restart, ~14 h away. Now handled by the
+  crash watcher (see *Crash watcher, nightly restart and the stale-Chromium
+  hook*).
+- **What the crash is.** Parse the minidump in `Crash Reports/pending/`: the
+  exception is signal 5 (SIGTRAP; on Linux the "error code" on the Aw Snap
+  page is the renderer's termination signal), and the crash keys include
+  `discardable-memory-ipc-requested-size=4194304` and
+  `discardable-memory-ipc-error-cause=browser side`. The renderer asked the
+  browser process for a 4 MiB discardable shared-memory segment, got an
+  invalid region back, and called `TerminateBecauseOutOfMemory` on purpose.
+  The 09-07 and 09-19 dumps have the identical signature. No OOM kill
+  (`oom_kill 0` in `/proc/vmstat`), no throttling, no network loss.
+- **What set it off: a Kinboard realtime write storm.** Kinboard's meal-plan
+  hook upserts `meal_plans` on every read and refetches on every
+  `meal_plans` realtime event, so two open clients feed each other writes
+  (2.4 M UPDATEs on 5 rows by that day, up to 405/s). Realtime logged
+  `MessagePerSecondRateLimitReached` at 12:36, 12:43 and **13:27:06**, two
+  seconds after the crash; on 09-19 it tripped 14 s before that crash.
+  Storms push the kiosk to ~1.6 of its 1.8 GB (Beszel 12:40–12:50 peak 1.64
+  GB, CPU 66%). Fixed on the server by a mounted local migration; see
+  `kinboard/README.md`, *Local override: meal_plans realtime*.
+- **Still unproven:** exactly why the browser-side allocation failed. The
+  Beszel peak for 13:20–13:30 is only 0.67 GB, so either the spike was
+  shorter than its once-a-minute sampling, or the storm broke it some other
+  way. The leading guess is `/tmp` (a 923 MB tmpfs that Chromium uses for
+  shared memory here, since the RPi `/etc/chromium.d/dev-shm` snippet adds
+  `--disable-dev-shm-usage`) filling up. Chromium's stderr goes to tty1, not
+  the journal, so the errno was lost at the restart.
+- **Beszel's 10-minute averages hide these storms.** They last a minute or
+  two; look at the peak fields (`mm` memory, `cpum` CPU) in `system_stats`,
+  not `mu`/`cpu`.
+- **Side finding, not causal:** after the 03:31 nightly restart one core sits
+  at 100% until 06:00 (Beszel CPU ~25% of 4 cores, against ~10% during the
+  day), and the page's renderer only launches at 06:00:03 when the screen
+  comes on. Not yet investigated.
+
 ## Gotchas hit on 2026-09-19
 
 - **The Wi-Fi link can die silently, and nothing notices.** At 15:15 the kiosk
@@ -429,8 +490,12 @@ zoom into text.
 - **Chromium "Aw, Snap!" (error code 5) at 20:50, everything else healthy.**
   A renderer crash; Chromium leaves it on screen forever. Crash dumps land in
   `~kiosk/.config/chromium/Crash Reports/pending/`. Fix in the moment:
-  `make kiosk-restart`. Durable guards: the nightly restart timer and the
-  stale-Chromium apt hook (see *Nightly compositor restart*).
+  `make kiosk-restart`. **Corrected 2026-09-23:** this was first blamed on
+  the 06:18 Chromium 152→153 upgrade running under the old browser. It was
+  not: `cage@tty1` had been restarted at 16:48 that afternoon, so the
+  browser was already the new binary, and the dump itself says
+  `ver=153.0.8010.47`. Its signature matches the 09-07 and 09-23 crashes;
+  see *Gotchas hit on 2026-09-23* for the actual mechanism.
 - **`/etc/hosts` edits do not survive a reboot.** The Imager's user-data sets
   cloud-init's `manage_etc_hosts: true`, so `/etc/hosts` is regenerated from
   `/etc/cloud/templates/hosts.debian.tmpl` at every boot. The `kinboard.local`

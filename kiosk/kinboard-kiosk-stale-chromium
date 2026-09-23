@@ -2,8 +2,9 @@
 # Restart the kiosk compositor if the running Chromium binary has been
 # replaced on disk (a package upgrade under the live browser). Chromium keeps
 # running from the old, unlinked executable, but every new renderer/utility
-# process it spawns comes from the new one, and the mismatch crashes tabs
-# ("Aw, Snap!"; the 2026-09-19 06:19 152->153 upgrade did this). Called by
+# process it spawns comes from the new one, and the mismatch can crash tabs
+# ("Aw, Snap!"). A precaution: first credited with the 2026-09-19 crash, but
+# that browser was already the new binary (kiosk/README.md, 09-19). Called by
 # the DPkg::Post-Invoke hook in /etc/apt/apt.conf.d/52kinboard-kiosk after
 # every apt run; safe to run by hand. Exit 0 always so apt never fails on it.
 #

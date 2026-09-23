@@ -1,0 +1,13 @@
+# Restarts the kiosk compositor after a Chromium crash
+# (kiosk/kinboard-kiosk-crash). Started by kinboard-kiosk-crash.path; the
+# rate limit lives in the script rather than in StartLimit*, because hitting a
+# unit start limit would leave the .path unit failed and the watcher dead
+# until someone reset it. Installed by kiosk/install.sh.
+[Unit]
+Description=Restart the Kinboard kiosk after a Chromium crash
+ConditionPathExists=/usr/local/bin/kinboard-kiosk
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/kinboard-kiosk
+ExecStart=/usr/local/bin/kinboard-kiosk-crash

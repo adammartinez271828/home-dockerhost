@@ -1,0 +1,13 @@
+# Watches Chromium's Crashpad pending/ folder and starts
+# kinboard-kiosk-crash.service when a dump lands there (created in place or
+# moved in from new/ -- both trigger PathChanged, tested 2026-09-23).
+# Installed and enabled by kiosk/install.sh.
+[Unit]
+Description=Watch for Chromium crash dumps on the Kinboard kiosk
+
+[Path]
+PathChanged=/home/kiosk/.config/chromium/Crash Reports/pending
+Unit=kinboard-kiosk-crash.service
+
+[Install]
+WantedBy=paths.target
