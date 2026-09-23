@@ -6,12 +6,18 @@
 #   network so Caddy can reach them by container name (kinboard-kong:8000,
 #   kinboard-webapp:3000) without any host-port binding.
 # - Parks go2rtc behind a profile: no cameras here, saves RAM.
+# - Mounts one local migration into the webapp (paths resolve from the
+#   project dir, kinboard/upstream/webapp/docker/, hence ../../../): it drops
+#   meal_plans from the realtime publication on every start to break a write
+#   storm (see migration_zzzzz_local_meal_plans_realtime.sql).
 # See kinboard/README.md.
 services:
   kong:
     networks: [kinboard, landockernet]
   webapp:
     networks: [kinboard, landockernet]
+    volumes:
+      - ../../../migration_zzzzz_local_meal_plans_realtime.sql:/app/migrations/migration_zzzzz_local_meal_plans_realtime.sql:ro
   go2rtc:
     profiles: ["cameras"]
 networks:
