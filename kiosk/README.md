@@ -358,7 +358,14 @@ page a 4 MiB shared-memory block, each during a Kinboard realtime write storm
   tab that crashes on every start cannot restart-loop the browser; past the
   cap it logs and waits for the nightly restart. The limit lives in the
   script, not in `StartLimit*`, because a unit hitting its start limit would
-  leave the `.path` unit failed and the watcher dead until reset. One line
+  leave the `.path` unit failed and the watcher dead until reset.
+  The folder also changes when nothing crashed: Crashpad's housekeeping,
+  about 10 min after every browser start, briefly creates and deletes a
+  `<uuid>.lock` file there. The first version restarted on any change, so on
+  2026-09-23 each restart scheduled the next (17:42, 17:52, then the cap
+  stopped it at 18:03). The script now acts only on a `.dmp` modified in the
+  last `KIOSK_CRASH_FRESH` s (default 120) that it has not handled yet, and
+  just notes the rest in the journal. One line
   per crash goes to `/var/log/kinboard-kiosk-crash.log` (the journal is
   volatile); the dumps stay in `pending/` as the durable record, since
   nothing uploads them. `make kiosk-crash-log` shows both.

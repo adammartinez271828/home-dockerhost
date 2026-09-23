@@ -8,6 +8,11 @@
 # and starts this. Runs as root. At most KIOSK_CRASH_MAX_PER_HOUR restarts
 # per rolling hour, so a tab that crashes on every start cannot restart-loop
 # the browser forever; past the cap it logs and leaves the page alone.
+# The .path unit fires on *any* change in pending/, and Crashpad's own
+# housekeeping (once, ~10 min after each browser start) touches that folder
+# without writing a dump; on 2026-09-23 that alone restarted the browser
+# every 10 min until the cap stopped it. So act only on a .dmp written in
+# the last KIOSK_CRASH_FRESH seconds that has not been handled yet.
 # Knobs live in /etc/default/kinboard-kiosk. The dumps themselves stay in
 # pending/ (Chromium never uploads them here): they are the durable record,
 # since the journal is volatile.
@@ -25,16 +30,28 @@ fi
 DIR="${KIOSK_CRASH_DIR:-/home/kiosk/.config/chromium/Crash Reports/pending}"
 MAX="${KIOSK_CRASH_MAX_PER_HOUR:-3}"
 LOG="${KIOSK_CRASH_LOG:-/var/log/kinboard-kiosk-crash.log}"
-# Restart history lives on tmpfs: per-boot by design, never on the card.
+FRESH="${KIOSK_CRASH_FRESH:-120}"
+# Restart history and the last handled dump live on tmpfs: per-boot by
+# design, never on the card.
 HIST=/run/kinboard-kiosk-crash.history
+HANDLED=/run/kinboard-kiosk-crash.handled
 
 # Crashpad writes the .dmp and then its .meta; let it finish (and let the
 # burst of inotify events settle) before killing the browser under it.
 sleep 5
 
-# shellcheck disable=SC2012  # Crashpad names dumps <uuid>.dmp/.meta; only logged
-newest=$(ls -t "$DIR" 2>/dev/null | head -n 1)
+# shellcheck disable=SC2012  # Crashpad names dumps <uuid>.dmp; no odd characters
+newest=$(ls -t "$DIR"/*.dmp 2>/dev/null | head -n 1)
 now=$(date +%s)
+# Not a crash: no dump, the newest one is old, or it was already handled.
+# Journal only (volatile), so a noisy folder never writes to the card.
+if [ -z "$newest" ] || [ $((now - $(stat -c %Y "$newest"))) -gt "$FRESH" ] ||
+	[ "$(cat "$HANDLED" 2>/dev/null)" = "$newest" ]; then
+	echo "kinboard-kiosk-crash: pending/ changed but no new dump (newest: ${newest:+$(basename "$newest")}), ignoring"
+	exit 0
+fi
+echo "$newest" >"$HANDLED"
+newest=$(basename "$newest")
 recent=$(awk -v cut=$((now - 3600)) '$1 > cut' "$HIST" 2>/dev/null | wc -l)
 if [ "$recent" -ge "$MAX" ]; then
 	echo "$(date -Iseconds) crash dump ${newest:-?}: $recent restarts in the last hour (cap $MAX), leaving it" >>"$LOG"

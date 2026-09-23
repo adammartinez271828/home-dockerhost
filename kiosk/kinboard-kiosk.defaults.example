@@ -72,5 +72,9 @@ KIOSK_NET_LOG=/var/log/kinboard-kiosk-net.log
 # every start cannot restart-loop the browser.
 KIOSK_CRASH_MAX_PER_HOUR=3
 
+# Only a dump written within this many seconds of the folder changing counts
+# as a crash; Crashpad's own housekeeping also touches pending/.
+KIOSK_CRASH_FRESH=120
+
 # One line per crash, append-only; crashes are rare, so no rotation.
 KIOSK_CRASH_LOG=/var/log/kinboard-kiosk-crash.log
