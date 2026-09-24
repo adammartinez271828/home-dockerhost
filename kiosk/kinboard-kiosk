@@ -20,6 +20,15 @@ fi
 # Honour the nightly screen schedule at (re)start so a reboot inside the
 # window stays dark (kinboard-kiosk-screen.timer re-checks every minute).
 kinboard-kiosk-screen auto || true
+# Start Chromium only once the output is on. While it is disabled wlroots
+# advertises no wl_output, and Chromium's Wayland init busy-loops
+# wl_display.sync until one appears: a full core (Chromium + Cage) from a
+# restart inside the window until screen-on (docs/kiosk-overnight-cpu-spin.md).
+# The screen timer enables the output at KIOSK_SCREEN_ON; Chromium follows
+# within 30 s.
+while ! kinboard-kiosk-screen status 2>/dev/null | grep -q ' enabled=yes '; do
+  sleep 30
+done
 exec chromium \
   --kiosk --noerrdialogs --disable-infobars --no-first-run \
   --ozone-platform=wayland \

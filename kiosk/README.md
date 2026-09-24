@@ -190,7 +190,7 @@ re-run the install** — never edit the installed copies by hand.
 
 | Tracked file | Installed as | What it is |
 |---|---|---|
-| `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, runs `kinboard-kiosk-screen auto` so a (re)start inside the off window stays dark, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
+| `kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk` (755) | POSIX-sh wrapper Cage runs: `wlr-randr` rotates (and optionally sets the mode of) the output, runs `kinboard-kiosk-screen auto` so a (re)start inside the off window stays dark, waits (30 s polls) until the output is on, then `exec chromium --kiosk --ozone-platform=wayland …` on Kinboard with the disk cache in `$XDG_RUNTIME_DIR` (RAM) |
 | `kinboard-kiosk-screen` | `/usr/local/bin/kinboard-kiosk-screen` (755) | `off` / `on` / `auto` / `status`: disables or re-enables the wlroots output (`wlr-randr --off`; `--on` re-applies transform/scale/mode). No signal → the BenQ drops into its own standby; Chromium keeps running so the page is current when the picture returns. `auto` compares the clock with `KIOSK_SCREEN_OFF/ON` and only acts on a mismatch; it also re-applies transform/scale when they drift, so an **HDMI hotplug self-heals within a minute** (unplugging makes wlroots destroy the output and the replug creates a fresh one at transform normal / scale 1 while Cage and Chromium keep running; bit us moving the display on 2026-09-07) |
 | `kinboard-kiosk-screen.service` + `.timer` | `/etc/systemd/system/` (644) | minutely timer running `kinboard-kiosk-screen auto` as `kiosk` inside the Cage session (`Requisite=cage@tty1`). Idempotent, so it rides through reboots, compositor restarts, DST and knob edits with no reload |
 | `kinboard-kiosk-net` + `.service` + `.timer`, `logrotate-kinboard-kiosk-net`, `apt.conf.d-kinboard-kiosk` | `/usr/local/bin/kinboard-kiosk-net` (755), `/etc/systemd/system/` (644), `/etc/logrotate.d/kinboard-kiosk-net` (644), `/etc/apt/apt.conf.d/52kinboard-kiosk` (644) | the Wi-Fi reachability watchdog and its weekly log rotation, plus the unattended-upgrades blacklist for `wpasupplicant`/`network-manager`. Minutely timer running `kinboard-kiosk-net tick` as **root** (no `Requisite=cage@tty1`: it must run even with the compositor down). See *Wi-Fi reachability watchdog* |
@@ -373,7 +373,12 @@ page a 4 MiB shared-memory block, each during a Kinboard realtime write storm
 - **`kinboard-kiosk-restart.timer`** restarts `cage@tty1` at 03:30 local
   (plus up to 5 min jitter), inside the 23:00–06:00 screen-off window, so
   the browser starts each day fresh. The wrapper re-applies the screen
-  schedule on start, so the restart stays dark.
+  schedule on start, so the restart stays dark, and then waits for the
+  output to be on before it starts Chromium. The page therefore loads at
+  06:00, within 30 s of screen-on. Started with no output, Chromium
+  busy-loops its Wayland init and, together with Cage, keeps one core busy
+  until screen-on (seen nightly 09-20 to 09-24; see
+  `docs/kiosk-overnight-cpu-spin.md`).
 - **`kinboard-kiosk-stale-chromium`** runs from the apt `DPkg::Post-Invoke`
   hook in `/etc/apt/apt.conf.d/52kinboard-kiosk` after every apt run. If the
   oldest `chromium` process's `/proc/PID/exe` ends in ` (deleted)`, the
