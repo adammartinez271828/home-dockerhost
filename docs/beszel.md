@@ -88,5 +88,7 @@ and `AGENT_SHA256` in that script too and re-run the installer.
 ## Upgrading
 
 Bump both `image:` tags together (hub and agent are released in lockstep),
-keep the previous digest in the `# current image` comment, `make up`. Release
+keep the previous digest in the `# current image` comment, `make up`. Then
+bump `AGENT_VERSION`/`AGENT_SHA256` in `kiosk/install-beszel-agent.sh` and
+`make kiosk-beszel-install` so the kiosk agent stays in step. Release
 notes: <https://github.com/henrygd/beszel/releases>.

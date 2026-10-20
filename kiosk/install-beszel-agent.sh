@@ -22,9 +22,9 @@
 # kitchen-kiosk, host 192.168.86.206, port 45876.
 set -euo pipefail
 
-AGENT_VERSION=0.19.0   # keep equal to the henrygd/beszel image tags in docker-compose.yml
+AGENT_VERSION=0.21.0   # keep equal to the henrygd/beszel image tags in docker-compose.yml
 AGENT_ARCH=arm64
-AGENT_SHA256=a037bb1822302d40a3c67ad56aa40c916742f61a27a498f991f222e303845eef
+AGENT_SHA256=809700314cbe193d00b8753b0f890a2302c2a1bdface6e01039ad835509a0630
 KIOSK_HOST="${KIOSK_HOST:-kiosk@kitchen-kiosk.local}"
 DOCKER_HOST="${DOCKER_HOST:-pi@dockerhost.local}"
 SERVICE_PATTERNS="cage@tty1.service,NetworkManager.service,unattended-upgrades.service"
