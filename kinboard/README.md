@@ -10,7 +10,7 @@ the app, so the checkout and the image tag must move together.
 
 What this directory holds:
 
-- `upstream/` — the submodule (upstream repo at tag `v1.10.0`). Do not edit
+- `upstream/` — the submodule (upstream repo at tag `v1.13.0`). Do not edit
   files in it; `setup.sh` rewrites `kong.yml` and `diun/diun.yml` in place,
   which is why `.gitmodules` sets `ignore = dirty`.
 - `docker-compose.override.yml` — host override, **copied** into
@@ -46,8 +46,10 @@ What this directory holds:
   Without that line the override is silently ignored and Caddy cannot reach
   the containers.
 - Push notifications are off (no VAPID keys: needs `node`, and HTTPS anyway).
-- The override also mounts one local migration into the webapp, which breaks
-  a realtime write storm (see *Local override: meal_plans realtime*).
+- `.env` pins `KINBOARD_ENTRY=webapp` (added at 1.13.0). Without it,
+  `start.sh up` moves a pre-1.13 install's port 3001 from the webapp to Kong.
+  Caddy is unaffected either way (it uses container names); the pin keeps
+  `127.0.0.1:3001` serving the webapp and its `/api/health`.
 
 ## Install (fresh host)
 
@@ -73,17 +75,25 @@ create the family (`/join`); the join code is under Settings.
 ## Upgrade
 
 Migrations are forward-only (see upstream `.env.example`), so **back up
-first** (`make backup-cloud`), then move the submodule and the tag together:
+first** (`make backup-cloud`), then move the submodule and the tag together.
+Read every release's notes between the two versions first: some need
+one-off post-steps (1.13.0: restart `realtime`, recreate `cron`).
 
 ```sh
 cd ~/devel/home-dockerhost
+# setup.sh's in-place edits block the checkout; it rewrites them below
+git -C kinboard/upstream checkout -- webapp/docker/kong.yml webapp/docker/diun/diun.yml
 git -C kinboard/upstream fetch --depth 1 origin tag vX.Y.Z
 git -C kinboard/upstream checkout vX.Y.Z
 sed -i 's/^KINBOARD_TAG=.*/KINBOARD_TAG=X.Y.Z/' kinboard/upstream/webapp/docker/.env
+(cd kinboard/upstream && ./setup.sh --non-interactive)   # keeps secrets and URLs
 cp kinboard/docker-compose.override.yml kinboard/upstream/webapp/docker/   # if it changed
 make kinboard-up && make kinboard-status
 git add kinboard/upstream && git commit -m "kinboard: vX.Y.Z"           # records the pin
 ```
+
+After `setup.sh`, check Kong's CORS origin is still `http://kinboard.local`
+(`grep -c kinboard.local kinboard/upstream/webapp/docker/kong.yml`).
 
 Rollback = `git checkout` the previous commit of this repo, re-checkout the
 submodule (`git submodule update`), set the old tag, `make kinboard-up`, and
@@ -92,62 +102,22 @@ restore the pre-upgrade dump if a migration already ran.
 On the Pi after any `git pull` that moved the submodule pointer:
 `git submodule update --init`.
 
-## Local override: meal_plans realtime
+## History: meal_plans realtime write storm (fixed upstream)
 
-**Why.** Kinboard v1.10.0 has a feedback loop between two hooks (still
-present in v1.11.0):
-
-- `useMealPlan()` in `webapp/src/hooks/use-meal-planner.ts` *upserts*
-  `meal_plans` (`onConflict: "family_id,week_start"`) every time it reads the
-  week. On an existing row that is an UPDATE, and the
-  `update_meal_plans_updated_at` trigger bumps `updated_at`.
-- `meal_plans` is in the `supabase_realtime` publication, and
-  `use-realtime.ts` answers any `meal_plans` event with an undebounced
-  `invalidateQueries(["meal-plans", family.id])`, which re-runs `useMealPlan()`.
-
-With two clients open (kiosk + a desktop browser), each one's refetch writes
-a row that triggers the other's refetch, and it amplifies until realtime's
-100 msg/s tenant limit kills the channels. By 2026-09-23 the table had taken
-**2,443,117 UPDATEs on 5 rows**, peaking at 405/s, and every storm pushed the
-kiosk to ~1.6 of its 1.8 GB. A storm was running when the kiosk's page crashed
-at 13:27 that day (realtime tripped its rate limit at 13:27:06); see
-`kiosk/README.md`, *Gotchas hit on 2026-09-23*.
-
-**What.** `kinboard/migration_zzzzz_local_meal_plans_realtime.sql` drops
-`meal_plans` from the publication. `meal_plan_entries`, which holds the
-actual meals, stays published and invalidates the same query key, so the
-dashboard still updates live when a meal changes; the only loss is that
-creating a new week's (empty) plan row is no longer pushed.
-
-**Why a mounted migration, not a one-off `ALTER`.** The webapp entrypoint
-re-applies every `/app/migrations/migration*.sql` on **every start**, and
-upstream's `migration.sql` re-adds `meal_plans` to the publication each time.
-A one-off `ALTER PUBLICATION` is silently undone by the next Pi reboot or
-`make kinboard-up`. So `kinboard/docker-compose.override.yml` bind-mounts the
-local file into `/app/migrations/`, and its `zzzzz` name sorts it after all
-upstream files (`migration.sql` and `migration_zzzz_*`), so it runs last on
-every boot. It is idempotent and cannot fail (the entrypoint retries a failed
-migration forever, so a failing file would wedge the webapp).
-
-**Deploy / after changing it.** The file must exist on the Pi *before* the
-container is recreated, or Docker bind-mounts an empty directory in its
-place (harmless: the entrypoint skips non-files, but clean it up).
-
-```sh
-cd ~/devel/home-dockerhost && git pull
-cp kinboard/docker-compose.override.yml kinboard/upstream/webapp/docker/
-make kinboard-up
-docker logs kinboard-webapp 2>&1 | grep migration_zzzzz      # "[entrypoint] applying ..."
-docker exec kinboard-db psql -U supabase_admin -d postgres -Atc \
-  "select tablename from pg_publication_tables where pubname='supabase_realtime' and tablename like 'meal%'"
-# -> meal_plan_entries only
-```
-
-**On every Kinboard upgrade**, check it still applies (the verify commands
-above), and drop the override once upstream fixes the loop: test by
-removing the mount, opening Kinboard in two browsers, and watching
-`select n_tup_upd from pg_stat_user_tables where relname='meal_plans'` for a
-minute; a few writes is fine, thousands is the loop.
+Up to v1.12.0, `useMealPlan()` upserted the week's `meal_plans` row on every
+read, and `use-realtime.ts` answered every `meal_plans` event by refetching,
+so two open clients drove each other into an UPDATE storm (2.4 M UPDATEs on 5
+rows by 2026-09-23, peaking at 405/s, pushing the kiosk to ~1.6 of 1.8 GB and
+contributing to its page crashes; see `kiosk/README.md`, *Gotchas hit on
+2026-09-23*). From 2026-09-23 to the 1.13.0 upgrade this repo carried a local
+migration (`kinboard/migration_zzzzz_local_meal_plans_realtime.sql`, mounted
+by the override) that dropped `meal_plans` from the realtime publication on
+every start. Upstream fixed the cause in v1.12.1 (#287: reads no longer
+write; a row is only inserted, `DO NOTHING` on conflict, when a meal is
+added), so the override was removed at 1.13.0; recover it from git history
+if the storm ever returns. To check:
+`select n_tup_upd from pg_stat_user_tables where relname='meal_plans'` with
+two browsers open should barely move over a few minutes.
 
 ## Backup and restore
 

@@ -454,8 +454,9 @@ zoom into text.
   `MessagePerSecondRateLimitReached` at 12:36, 12:43 and **13:27:06**, two
   seconds after the crash; on 09-19 it tripped 14 s before that crash.
   Storms push the kiosk to ~1.6 of its 1.8 GB (Beszel 12:40–12:50 peak 1.64
-  GB, CPU 66%). Fixed on the server by a mounted local migration; see
-  `kinboard/README.md`, *Local override: meal_plans realtime*.
+  GB, CPU 66%). Fixed on the server by a mounted local migration, later
+  by upstream (1.12.1, #287); see `kinboard/README.md`, *History: meal_plans
+  realtime write storm*.
 - **Still unproven:** exactly why the browser-side allocation failed. The
   Beszel peak for 13:20–13:30 is only 0.67 GB, so either the spike was
   shorter than its once-a-minute sampling, or the storm broke it some other
