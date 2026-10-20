@@ -5,7 +5,7 @@ services:
   # network. Plain HTTP only — see Caddyfile.
   caddy:
     container_name: con_caddy
-    image: caddy:2.11.3-alpine
+    image: caddy:2.11.7-alpine
     # image: caddy@sha256:86deaf5e3d3408a6ccec08fbb79989783dd26e206ae10bcf78a801dc8c9ab794  # current image
     restart: unless-stopped
     mem_limit: 128m
@@ -74,7 +74,7 @@ services:
   # file; apply changes with `make smokeping-targets`.
   smokeping:
     container_name: con_smokeping
-    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls182
+    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls186
     # image: lscr.io/linuxserver/smokeping@sha256:2f4488c9afcddb36ec5c1b091e71269c06b4b05bd6775f1d015701a830cb8e86  # current image
     restart: unless-stopped
     mem_limit: 128m
@@ -92,7 +92,7 @@ services:
   # env.d/speedtest.env (gitignored; copy from speedtest.env.example).
   speedtest:
     container_name: con_speedtest
-    image: lscr.io/linuxserver/speedtest-tracker:v1.15.0-ls170
+    image: lscr.io/linuxserver/speedtest-tracker:v1.15.0-ls175
     # image: lscr.io/linuxserver/speedtest-tracker@sha256:1193562c4ab4fe29cffd5e6ad4c042a2ed02e218999bedc7c801c96e032d9f9b  # current image
     restart: unless-stopped
     mem_limit: 256m
