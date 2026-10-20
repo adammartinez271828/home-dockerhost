@@ -24,7 +24,7 @@ services:
 
   db_recipes:
     container_name: con_db_recipes
-    image: postgres:16.8-alpine
+    image: postgres:16.15-alpine
     # image: postgres@sha256:3b057e1c2c6dfee60a30950096f3fab33be141dbb0fdd7af3d477083de94166c  # current image
     restart: unless-stopped
     mem_limit: 512m
@@ -49,7 +49,7 @@ services:
   # previous image.
   web_recipes:
     container_name: con_web_recipes
-    image: vabene1111/recipes:2.6.13
+    image: vabene1111/recipes:2.6.15
     # image: vabene1111/recipes@sha256:f6c58afdea7a721d079ebd6ee5483f2c9da77dd1e709e16d60a82c218e80a451  # current image
     # pre-2.x rollback (needs the matching pre-upgrade DB dump restored, see docs/backup-restore.md):
     # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # 1.5.33
