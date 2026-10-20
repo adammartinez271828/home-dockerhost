@@ -110,7 +110,7 @@ services:
   # agent's KEY (the hub's public key) is a credential → env.d/beszel.env.
   beszel:
     container_name: con_beszel
-    image: henrygd/beszel:0.19.0
+    image: henrygd/beszel:0.21.0
     # image: henrygd/beszel@sha256:fefb27166f5e1611ebf67f8697ea928a23f44efdb00af922e2ac3b5faa2efd5c  # current image
     restart: unless-stopped
     mem_limit: 256m
@@ -129,7 +129,7 @@ services:
 
   beszel_agent:
     container_name: con_beszel_agent
-    image: henrygd/beszel-agent:0.19.0
+    image: henrygd/beszel-agent:0.21.0
     # image: henrygd/beszel-agent@sha256:00c88600e7d120128f623b2deb5257603d464e841fd68f88cc791dcc075f9e46  # current image
     restart: unless-stopped
     network_mode: host
