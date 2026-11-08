@@ -94,6 +94,6 @@ rclone's shared client is retired) and copied to the Pi.
 
 ## Host provisioning
 
-`scripts/setup.sh` is a one-time bootstrap run as root on a fresh Debian/Pi host: installs Docker CE + compose plugin (plus `shellcheck` for the pre-commit hook), adds the `pi` user to the `docker` group, enables the repo's git pre-commit hook, sets up json-file log rotation, and appends cgroup memory flags to `/boot/cmdline.txt` (required for Docker memory accounting on the Pi — needs a reboot). It is idempotent-ish but intended to run once at provision time, not as part of normal deploys.
+`scripts/setup.sh` is a one-time bootstrap run as root on a fresh Debian/Pi host: installs Docker CE + compose plugin (plus `shellcheck` for the pre-commit hook), adds the `pi` user to the `docker` group, enables the repo's git pre-commit hook, sets up json-file log rotation, and appends cgroup memory flags to `/boot/cmdline.txt` (required for Docker memory accounting on the Pi — needs a reboot) plus `nvme_core.default_ps_max_latency_us=0 pcie_aspm=off`, which keeps the NVMe out of deep power states after the 2026-11-08 root-disk stalls on the Pi 5. It is idempotent-ish but intended to run once at provision time, not as part of normal deploys.
 
 `scripts/dev-setup.sh` (or `make dev-setup`) is the counterpart for a clone that *works on* the repo but doesn't host the stack (a laptop, a Mac): it enables the pre-commit hook and checks for `shellcheck` / `docker compose`, printing a per-package-manager install hint for anything missing. Portable and non-root; safe to re-run.

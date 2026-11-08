@@ -22,6 +22,13 @@ CMDLINE=/boot/cmdline.txt
 if ! grep -q cgroup_memory "$CMDLINE"; then
 	echo -n " cgroup_enable=cpuset cgroup_memory=1 cgroup_enable=memory" >> "$CMDLINE"
 fi
+# Keep the NVMe and its PCIe link out of deep power-saving states. On 2026-11-08
+# the Pi 5 (WD SN5000) hung twice: root-disk writes stalled, the journal went
+# silent, then dockerd and the services died. Edit line 1 in place, because
+# cmdline.txt must stay a single line.
+if ! grep -q default_ps_max_latency_us "$CMDLINE"; then
+	sed -i '1 s/$/ nvme_core.default_ps_max_latency_us=0 pcie_aspm=off/' "$CMDLINE"
+fi
 
 # update
 apt-get update
