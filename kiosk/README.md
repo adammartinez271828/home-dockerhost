@@ -179,7 +179,8 @@ restart (`make kiosk-restart`); check with `fc-match ':charset=1f339'` →
 
 Check: `cage -v`, `chromium --version`; from the kiosk
 `curl -s -o /dev/null -w '%{http_code}\n' http://kinboard.local/` → `200`,
-`…/rest/v1/` → `401` (Kong), `…/api/health` contains `"db":true`.
+`…/api/health` contains `"db":true` (before Kinboard 1.15, `…/rest/v1/` → `401`
+from Kong was also a check; Kong is gone and that URL now redirects to a 404).
 
 ## Compositor and kiosk unit (Phase 6)
 
