@@ -49,8 +49,8 @@ services:
   # previous image.
   web_recipes:
     container_name: con_web_recipes
-    image: vabene1111/recipes:2.6.15
-    # image: vabene1111/recipes@sha256:f6c58afdea7a721d079ebd6ee5483f2c9da77dd1e709e16d60a82c218e80a451  # current image
+    image: vabene1111/recipes:2.7.8
+    # image: vabene1111/recipes@sha256:2e759dd1478a2ed119ee474e28522079fb1cfa50b3fd25cba89f6b9a67abad72  # current image (2.6.15; rollback needs backups/recipes-20261126-061600.dump restored --live)
     # pre-2.x rollback (needs the matching pre-upgrade DB dump restored, see docs/backup-restore.md):
     # image: vabene1111/recipes@sha256:e61e3280ed3fb15566230628d82cdbe9bcb68d62cac4500fda431ca8afd045a8  # 1.5.33
     restart: unless-stopped
