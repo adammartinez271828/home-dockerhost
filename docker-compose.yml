@@ -5,8 +5,8 @@ services:
   # network. Plain HTTP only — see Caddyfile.
   caddy:
     container_name: con_caddy
-    image: caddy:2.11.7-alpine
-    # image: caddy@sha256:86deaf5e3d3408a6ccec08fbb79989783dd26e206ae10bcf78a801dc8c9ab794  # current image
+    image: caddy:2.11.9-alpine
+    # image: caddy@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f  # current image
     restart: unless-stopped
     mem_limit: 128m
     mem_reservation: 32m
@@ -24,8 +24,8 @@ services:
 
   db_recipes:
     container_name: con_db_recipes
-    image: postgres:16.15-alpine
-    # image: postgres@sha256:3b057e1c2c6dfee60a30950096f3fab33be141dbb0fdd7af3d477083de94166c  # current image
+    image: postgres:16.16-alpine
+    # image: postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea  # current image
     restart: unless-stopped
     mem_limit: 512m
     mem_reservation: 128m
@@ -74,8 +74,8 @@ services:
   # file; apply changes with `make smokeping-targets`.
   smokeping:
     container_name: con_smokeping
-    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls186
-    # image: lscr.io/linuxserver/smokeping@sha256:2f4488c9afcddb36ec5c1b091e71269c06b4b05bd6775f1d015701a830cb8e86  # current image
+    image: lscr.io/linuxserver/smokeping:2.9.0-r0-ls192
+    # image: lscr.io/linuxserver/smokeping@sha256:52ab5b6bb2cbe03e775f970ac110300964d4069917820fccdfd6db80dd5ac143  # current image
     restart: unless-stopped
     mem_limit: 128m
     mem_reservation: 32m
@@ -92,8 +92,8 @@ services:
   # env.d/speedtest.env (gitignored; copy from speedtest.env.example).
   speedtest:
     container_name: con_speedtest
-    image: lscr.io/linuxserver/speedtest-tracker:v1.15.0-ls175
-    # image: lscr.io/linuxserver/speedtest-tracker@sha256:1193562c4ab4fe29cffd5e6ad4c042a2ed02e218999bedc7c801c96e032d9f9b  # current image
+    image: lscr.io/linuxserver/speedtest-tracker:v1.15.1-ls183
+    # image: lscr.io/linuxserver/speedtest-tracker@sha256:1eeed2307699c083407bd4c1eb86f14d5179f9e1cd960f57d4cbab6f1f8b8a42  # current image
     restart: unless-stopped
     mem_limit: 256m
     mem_reservation: 64m
@@ -110,8 +110,8 @@ services:
   # agent's KEY (the hub's public key) is a credential → env.d/beszel.env.
   beszel:
     container_name: con_beszel
-    image: henrygd/beszel:0.21.0
-    # image: henrygd/beszel@sha256:fefb27166f5e1611ebf67f8697ea928a23f44efdb00af922e2ac3b5faa2efd5c  # current image
+    image: henrygd/beszel:0.21.2
+    # image: henrygd/beszel@sha256:6b39a8b64f9b15d00a25e7683e31a93c46161182a54f62713525107064e10599  # current image
     restart: unless-stopped
     mem_limit: 256m
     mem_reservation: 64m
@@ -129,8 +129,8 @@ services:
 
   beszel_agent:
     container_name: con_beszel_agent
-    image: henrygd/beszel-agent:0.21.0
-    # image: henrygd/beszel-agent@sha256:00c88600e7d120128f623b2deb5257603d464e841fd68f88cc791dcc075f9e46  # current image
+    image: henrygd/beszel-agent:0.21.2
+    # image: henrygd/beszel-agent@sha256:f27b1aa2c68404bc5b9e1a2ab36653bd9b4ee14f6299862f09cd5051a4134767  # current image
     restart: unless-stopped
     network_mode: host
     mem_limit: 128m
