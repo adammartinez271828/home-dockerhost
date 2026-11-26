@@ -2,14 +2,13 @@
 # submodule at kinboard/upstream/webapp/docker/, where start.sh loads it via
 # COMPOSE_FILES in .env alongside docker-compose.yml + docker-compose.image.yml.
 #
-# - Puts Kong (the Supabase gateway) and the webapp on the homelab's shared
-#   network so Caddy can reach them by container name (kinboard-kong:8000,
-#   kinboard-webapp:3000) without any host-port binding.
+# - Puts the webapp on the homelab's shared network so Caddy can reach it by
+#   container name (kinboard-webapp:3000) without any host-port binding.
+#   (Kong was retired upstream in 1.15; a block naming it makes compose refuse
+#   to start.)
 # - Parks go2rtc behind a profile: no cameras here, saves RAM.
 # See kinboard/README.md.
 services:
-  kong:
-    networks: [kinboard, landockernet]
   webapp:
     networks: [kinboard, landockernet]
   go2rtc:

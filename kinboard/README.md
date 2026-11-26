@@ -5,17 +5,17 @@
 services it is **not** in this repo's `docker-compose.yml`: it is its own
 compose project, driven by upstream's `start.sh`, living in the git submodule
 `kinboard/upstream` pinned to the release tag that matches `KINBOARD_TAG`.
-The compose files, `kong.yml`, `init.sql` and migrations are versioned with
+The compose files, `init.sql` and migrations are versioned with
 the app, so the checkout and the image tag must move together.
 
 What this directory holds:
 
-- `upstream/` — the submodule (upstream repo at tag `v1.13.0`). Do not edit
-  files in it; `setup.sh` rewrites `kong.yml` and `diun/diun.yml` in place,
-  which is why `.gitmodules` sets `ignore = dirty`.
+- `upstream/` — the submodule (upstream repo at tag `v1.17.0`). Do not edit
+  files in it; `setup.sh` rewrites `diun/diun.yml` in place (and, before 1.15,
+  `kong.yml`), which is why `.gitmodules` sets `ignore = dirty`.
 - `docker-compose.override.yml` — host override, **copied** into
-  `upstream/webapp/docker/`. Joins `kong` and `webapp` to
-  `network_landockernet` so Caddy can reach them by container name, and
+  `upstream/webapp/docker/`. Joins `webapp` to `network_landockernet` so
+  Caddy can reach it by container name, and
   parks `go2rtc` behind a `cameras` profile (no cameras, saves RAM).
 - This README. The host-specific `.env` is documented in
   `env.d/kinboard.env.example`; the real file lives inside the submodule at
@@ -26,30 +26,29 @@ What this directory holds:
 - Runtime dir: `~/devel/home-dockerhost/kinboard/upstream/webapp/docker`
   (`make kinboard-up/-status/-logs` cd there and call `start.sh`).
 - Data: `DATA_DIR=/home/pi/kinboard-data` — `db/` (Postgres, root-owned) and
-  `storage/` (Supabase storage uploads). Outside the repo tree on purpose.
-- Containers: `kinboard-db` (supabase/postgres 15), `kinboard-db-init`
-  (one-shot, `Exited (0)` is normal), `kinboard-auth`, `kinboard-rest`,
-  `kinboard-storage`, `kinboard-realtime`, `kinboard-imgproxy`,
-  `kinboard-kong`, `kinboard-webapp`, `kinboard-cron`.
+  `storage/` (uploads; since 1.15 in `storage/files/<bucket>/<path>`,
+  hard-linked from the old Supabase `storage/stub/stub/` tree, which stays
+  for rollback). Outside the repo tree on purpose.
+- Containers (since 1.15): `kinboard-db` (supabase/postgres 15),
+  `kinboard-db-init` (one-shot, `Exited (0)` is normal), `kinboard-rest`
+  (PostgREST), `kinboard-webapp`, `kinboard-cron`; `go2rtc` is parked by the
+  override. Kong, GoTrue, Realtime, Storage and imgproxy were retired at 1.15:
+  the webapp now proxies `/rest/v1`, serves files and pushes live updates (SSE
+  from Postgres `LISTEN`/`NOTIFY`) itself.
 - Host ports, all **loopback only** (the documented exception to "only Caddy
-  binds a host port"): `127.0.0.1:5432` Postgres, `:8100`/`:8543` Kong,
-  `:3001` webapp. `ss -ltnp | grep 5432` must show `127.0.0.1` only; Tandoor's
+  binds a host port"): `127.0.0.1:5432` Postgres, `:3001` webapp. `ss -ltnp | grep 5432` must show `127.0.0.1` only; Tandoor's
   Postgres publishes no host port, so the two never conflict.
-- Caddy: `http://kinboard.local` is one origin split by path —
-  `/rest/* /auth/* /storage/* /realtime/*` → `kinboard-kong:8000`, everything
-  else → `kinboard-webapp:3000` (`caddy/Caddyfile`). `setup.sh --url
-  http://kinboard.local` sets `API_EXTERNAL_URL`/`SITE_URL` to the same
-  origin and pins Kong's CORS origin to it (6 occurrences in `kong.yml`).
+- Caddy: `http://kinboard.local` → `kinboard-webapp:3000`, everything
+  (`caddy/Caddyfile`). `setup.sh --url http://kinboard.local` sets
+  `SITE_URL` to that origin.
 - `start.sh` passes explicit `-f` files, which disables compose's automatic
   loading of `docker-compose.override.yml`. The `.env` therefore ends with
   `COMPOSE_FILES="-f docker-compose.yml -f docker-compose.image.yml -f docker-compose.override.yml"`.
   Without that line the override is silently ignored and Caddy cannot reach
   the containers.
 - Push notifications are off (no VAPID keys: needs `node`, and HTTPS anyway).
-- `.env` pins `KINBOARD_ENTRY=webapp` (added at 1.13.0). Without it,
-  `start.sh up` moves a pre-1.13 install's port 3001 from the webapp to Kong.
-  Caddy is unaffected either way (it uses container names); the pin keeps
-  `127.0.0.1:3001` serving the webapp and its `/api/health`.
+- `.env` still carries the pre-1.15 `KINBOARD_ENTRY`, `API_EXTERNAL_URL`,
+  `KONG_*` and `ADDITIONAL_REDIRECT_URLS` lines; 1.15+ ignores them.
 
 ## Install (fresh host)
 
@@ -66,10 +65,8 @@ cd webapp/docker && ./start.sh up
 curl -s http://127.0.0.1:3001/api/health      # {"status":"ok",...,"db":true}
 ```
 
-First boot: `kinboard-webapp` may restart several times while
-`kinboard-storage` is still creating its schema (`relation "storage.buckets"
-does not exist` in its log). It settles within a minute; the final entrypoint
-run applies every migration cleanly. Then open `http://kinboard.local/` and
+First boot applies every numbered migration once and records it in
+`kinboard.schema_migrations`. Then open `http://kinboard.local/` and
 create the family (`/join`); the join code is under Settings.
 
 ## Upgrade
@@ -77,12 +74,13 @@ create the family (`/join`); the join code is under Settings.
 Migrations are forward-only (see upstream `.env.example`), so **back up
 first** (`make backup-cloud`), then move the submodule and the tag together.
 Read every release's notes between the two versions first: some need
-one-off post-steps (1.13.0: restart `realtime`, recreate `cron`).
+one-off post-steps, collected in upstream `UPGRADING.md` (1.15: overlays and
+proxies must drop Kong; see *History* below).
 
 ```sh
 cd ~/devel/home-dockerhost
-# setup.sh's in-place edits block the checkout; it rewrites them below
-git -C kinboard/upstream checkout -- webapp/docker/kong.yml webapp/docker/diun/diun.yml
+# setup.sh's in-place edit blocks the checkout; it rewrites it below
+git -C kinboard/upstream checkout -- webapp/docker/diun/diun.yml
 git -C kinboard/upstream fetch --depth 1 origin tag vX.Y.Z
 git -C kinboard/upstream checkout vX.Y.Z
 sed -i 's/^KINBOARD_TAG=.*/KINBOARD_TAG=X.Y.Z/' kinboard/upstream/webapp/docker/.env
@@ -92,15 +90,23 @@ make kinboard-up && make kinboard-status
 git add kinboard/upstream && git commit -m "kinboard: vX.Y.Z"           # records the pin
 ```
 
-After `setup.sh`, check Kong's CORS origin is still `http://kinboard.local`
-(`grep -c kinboard.local kinboard/upstream/webapp/docker/kong.yml`).
-
 Rollback = `git checkout` the previous commit of this repo, re-checkout the
 submodule (`git submodule update`), set the old tag, `make kinboard-up`, and
 restore the pre-upgrade dump if a migration already ran.
 
 On the Pi after any `git pull` that moved the submodule pointer:
 `git submodule update --init`.
+
+## History: 1.13.0 → 1.17.0 (Kong retired), 2026-11-26
+
+1.15 shrank the stack from eleven containers to six and put everything on the
+webapp's port. This repo's side: the override lost its `kong:` block (compose
+refuses to start with it), Caddy went from a path split to a single
+`reverse_proxy kinboard-webapp:3000`, and `start.sh up` removed the retired
+containers (`--remove-orphans`). The backup needed no change: same
+`kinboard-db` container and `supabase_admin` role, and `~/kinboard-data/storage`
+holds both the old and the new file layout. Rollback to 1.13.0 additionally
+needs the old Caddyfile and override from git history.
 
 ## History: meal_plans realtime write storm (fixed upstream)
 
